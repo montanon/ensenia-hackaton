@@ -43,6 +43,9 @@ class Settings(BaseSettings):
     # Cloudflare Configuration
     cloudflare_worker_url: str
     cloudflare_api_token: str | None = None
+    cloudflare_request_timeout: int = 30  # seconds
+    cloudflare_max_retries: int = 3
+    cloudflare_cache_ttl: int = 3600  # 1 hour for curriculum content
 
     # Database Configuration
     database_url: str = "postgresql+asyncpg://ensenia:hackathon@localhost:5433/ensenia"
