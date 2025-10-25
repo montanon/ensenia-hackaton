@@ -229,7 +229,7 @@ class ElevenLabsService:
                 voice_settings=voice_settings,
             )
 
-            for chunk in audio_stream:
+            async for chunk in audio_stream:
                 if chunk:
                     yield chunk
 
