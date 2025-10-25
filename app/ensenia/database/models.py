@@ -27,11 +27,13 @@ class Session(Base):
 
     id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
     created_at: Mapped[datetime] = mapped_column(
-        server_default=func.now(), nullable=False
+        server_default=func.now(), nullable=False, index=True
     )
-    grade: Mapped[int] = mapped_column(nullable=False)
-    subject: Mapped[str] = mapped_column(nullable=False)
-    mode: Mapped[str] = mapped_column(nullable=False)  # learn/practice/evaluation/study
+    grade: Mapped[int] = mapped_column(nullable=False, index=True)
+    subject: Mapped[str] = mapped_column(nullable=False, index=True)
+    mode: Mapped[str] = mapped_column(
+        nullable=False, index=True
+    )  # learn/practice/evaluation/study
     research_context: Mapped[str | None] = mapped_column(Text, nullable=True)
 
     # Relationship to messages
@@ -58,12 +60,12 @@ class Message(Base):
 
     id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
     session_id: Mapped[int] = mapped_column(
-        ForeignKey("sessions.id", ondelete="CASCADE"), nullable=False
+        ForeignKey("sessions.id", ondelete="CASCADE"), nullable=False, index=True
     )
-    role: Mapped[str] = mapped_column(nullable=False)  # user or assistant
+    role: Mapped[str] = mapped_column(nullable=False, index=True)  # user or assistant
     content: Mapped[str] = mapped_column(Text, nullable=False)
     timestamp: Mapped[datetime] = mapped_column(
-        default=lambda: datetime.now(UTC), nullable=False
+        default=lambda: datetime.now(UTC), nullable=False, index=True
     )
 
     # Relationship to session

@@ -15,6 +15,7 @@ from sqlalchemy.orm import selectinload
 from app.ensenia.config import get_settings
 from app.ensenia.database.models import Message as DBMessage
 from app.ensenia.database.models import Session as DBSession
+from app.ensenia.models import ChatMode
 
 logger = logging.getLogger(__name__)
 settings = get_settings()
@@ -110,7 +111,16 @@ class ChatService:
         Returns:
             Formatted system prompt
 
+        Raises:
+            ValueError: If mode is invalid
+
         """
+        # Validate mode
+        valid_modes = {m.value for m in ChatMode}
+        if mode not in valid_modes:
+            msg = f"Invalid mode: {mode}. Must be one of {valid_modes}"
+            raise ValueError(msg)
+
         template = SYSTEM_PROMPTS.get(mode, SYSTEM_PROMPTS["learn"])
 
         context = (
@@ -187,6 +197,12 @@ class ChatService:
             )
 
             assistant_message = response.choices[0].message.content
+            if not assistant_message:
+                logger.error(
+                    "OpenAI returned empty response for session %s", session_id
+                )
+                msg = "Received empty response from OpenAI"
+                raise ValueError(msg)
 
             # Save both messages to database
             user_msg = DBMessage(
@@ -205,7 +221,13 @@ class ChatService:
 
             db.add(user_msg)
             db.add(assistant_msg)
-            await db.commit()
+
+            try:
+                await db.commit()
+            except Exception:
+                await db.rollback()
+                logger.exception("Error committing messages to database")
+                raise
 
             logger.info(
                 "Message exchange saved (session=%s, tokens=%s)",

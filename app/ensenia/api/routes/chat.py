@@ -16,6 +16,7 @@ from sqlalchemy.orm import selectinload
 
 from app.ensenia.database.models import Session as DBSession
 from app.ensenia.database.session import get_db
+from app.ensenia.models import ChatMode
 from app.ensenia.services.chat_service import get_chat_service
 from app.ensenia.services.research_service import get_research_service
 
@@ -30,11 +31,7 @@ class CreateSessionRequest(BaseModel):
 
     grade: int = Field(..., ge=1, le=12, description="Grade level (1-12)")
     subject: str = Field(..., min_length=1, description="Subject area")
-    mode: str = Field(
-        ...,
-        pattern="^(learn|practice|evaluation|study)$",
-        description="Chat mode",
-    )
+    mode: ChatMode = Field(..., description="Chat mode")
     topic: str | None = Field(None, description="Optional topic for initial research")
 
 
@@ -116,7 +113,7 @@ async def create_session(
         session = DBSession(
             grade=request.grade,
             subject=request.subject,
-            mode=request.mode,
+            mode=request.mode.value,  # Convert enum to string
             research_context=None,
         )
 
@@ -144,8 +141,6 @@ async def create_session(
                 logger.info("Loaded research context for session %s", session.id)
             except Exception:
                 logger.exception("Error loading research context")
-            finally:
-                await research_service.close()
 
         return CreateSessionResponse(
             session_id=session.id,
@@ -218,13 +213,10 @@ async def trigger_research(
     """
     try:
         research_service = get_research_service()
-        try:
-            context = await research_service.update_session_context(
-                session_id, request.topic, db
-            )
-            return ResearchResponse(context=context)
-        finally:
-            await research_service.close()
+        context = await research_service.update_session_context(
+            session_id, request.topic, db
+        )
+        return ResearchResponse(context=context)
 
     except ValueError as e:
         raise HTTPException(status_code=404, detail=str(e)) from e

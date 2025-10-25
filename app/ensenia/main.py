@@ -20,6 +20,7 @@ from fastapi.staticfiles import StaticFiles
 from app.ensenia.api.routes import chat, tts
 from app.ensenia.config import get_settings
 from app.ensenia.database.session import close_db, init_db
+from app.ensenia.services.research_service import cleanup_research_service
 
 # Configure logging
 logging.basicConfig(
@@ -38,6 +39,7 @@ async def lifespan(_: FastAPI) -> AsyncGenerator[None, None]:
     logger.info("Startup complete")
     yield
     logger.info("Shutting down...")
+    await cleanup_research_service()
     await close_db()
     logger.info("Shutdown complete")
 
