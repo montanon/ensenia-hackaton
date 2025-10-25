@@ -17,6 +17,20 @@ interface CurriculumRow {
   keywords: string;
 }
 
+interface PopulateResultItem {
+  id: string;
+  title?: string;
+  status: 'success' | 'error';
+  message?: string;
+}
+
+interface PopulateResults {
+  total: number;
+  success: number;
+  errors: number;
+  items: PopulateResultItem[];
+}
+
 /**
  * Populate Vectorize index with curriculum embeddings
  */
@@ -55,11 +69,11 @@ export async function handlePopulateVectorize(
     }
 
     // Step 2: Process each content item
-    const results = {
+    const results: PopulateResults = {
       total: contents.length,
       success: 0,
       errors: 0,
-      items: [] as any[],
+      items: [],
     };
 
     for (const content of contents) {
@@ -120,12 +134,12 @@ export async function handlePopulateVectorize(
 
         // Small delay to avoid rate limiting
         await new Promise((resolve) => setTimeout(resolve, 100));
-      } catch (error: any) {
+      } catch (error) {
         results.errors++;
         results.items.push({
           id: content.id,
           status: 'error',
-          message: error.message,
+          message: error instanceof Error ? error.message : 'Unknown error',
         });
       }
     }
@@ -136,12 +150,12 @@ export async function handlePopulateVectorize(
       results,
       processing_time_ms: Date.now() - startTime,
     });
-  } catch (error: any) {
+  } catch (error) {
     console.error('Populate vectorize error:', error);
     return errorResponse(
       500,
       'POPULATE_FAILED',
-      error.message || 'Failed to populate Vectorize'
+      error instanceof Error ? error.message : 'Failed to populate Vectorize'
     );
   }
 }
