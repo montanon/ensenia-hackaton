@@ -2,6 +2,19 @@
 
 from enum import Enum
 
+from app.ensenia.models.curriculum import (
+    CurriculumContent,
+    FetchResponse,
+    GenerateRequest,
+    GenerateResponse,
+    SearchRequest,
+    SearchResponse,
+    SearchResultMetadata,
+    ValidateRequest,
+    ValidateResponse,
+    ValidationDetails,
+)
+
 
 class ChatMode(str, Enum):
     """Chat mode enumeration.
@@ -15,4 +28,16 @@ class ChatMode(str, Enum):
     STUDY = "study"
 
 
-__all__ = ["ChatMode"]
+__all__ = [
+    "ChatMode",
+    "SearchRequest",
+    "SearchResponse",
+    "SearchResultMetadata",
+    "FetchResponse",
+    "CurriculumContent",
+    "GenerateRequest",
+    "GenerateResponse",
+    "ValidateRequest",
+    "ValidateResponse",
+    "ValidationDetails",
+]

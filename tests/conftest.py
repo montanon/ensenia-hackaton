@@ -48,8 +48,34 @@ def mock_settings(monkeypatch):
     mock_settings_obj.cloudflare_d1_database_id = "test-db-id"
     mock_settings_obj.cloudflare_vectorize_index = "test-index"
     mock_settings_obj.cloudflare_kv_namespace_id = "test-kv-id"
+
+    # New Worker integration settings
+    mock_settings_obj.cloudflare_worker_url = "https://test-worker.workers.dev"
+    mock_settings_obj.cloudflare_request_timeout = 30
+    mock_settings_obj.cloudflare_max_retries = 3
+    mock_settings_obj.cloudflare_cache_ttl = 3600
+
+    # OpenAI settings
+    mock_settings_obj.openai_api_key = "test-openai-key"
+    mock_settings_obj.openai_model = "gpt-4-turbo-preview"
+    mock_settings_obj.openai_max_tokens = 2000
+    mock_settings_obj.openai_temperature = 0.4
+
+    # ElevenLabs settings
     mock_settings_obj.elevenlabs_api_key = "test-elevenlabs-key"
     mock_settings_obj.elevenlabs_voice_id = "test-voice-id"
+
+    # Database settings
+    mock_settings_obj.database_url = (
+        "postgresql+asyncpg://test:test@localhost:5433/test"
+    )
+    mock_settings_obj.database_pool_size = 5
+    mock_settings_obj.database_max_overflow = 10
+
+    # Chat settings
+    mock_settings_obj.chat_context_window = 10
+
+    # App settings
     mock_settings_obj.environment = "test"
     mock_settings_obj.debug = True
     mock_settings_obj.log_level = "INFO"
@@ -62,10 +88,13 @@ def mock_settings(monkeypatch):
     mock_settings_obj.rag_min_similarity_score = 0.7
     mock_settings_obj.rag_chunk_size = 768
     mock_settings_obj.rag_chunk_overlap = 128
-    mock_settings_obj.workers_ai_embedding_model = "@cf/baai/bge-base-en-v1.5"
-    mock_settings_obj.workers_ai_embedding_dimensions = 768
+    mock_settings_obj.workers_ai_embedding_model = "@cf/baai/bge-large-en-v1.5"
+    mock_settings_obj.workers_ai_embedding_dimensions = 1024
 
-    # Patch the settings object
-    monkeypatch.setattr("app.ensenia.core.config.settings", mock_settings_obj)
+    # Patch the get_settings function to return our mock
+    monkeypatch.setattr("app.ensenia.config.get_settings", lambda: mock_settings_obj)
+    monkeypatch.setattr(
+        "app.ensenia.services.research_service.settings", mock_settings_obj
+    )
 
     return mock_settings_obj

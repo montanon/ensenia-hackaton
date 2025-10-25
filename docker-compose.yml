@@ -1,4 +1,5 @@
 services:
+  # PostgreSQL Database
   postgres:
     image: postgres:16-alpine
     container_name: ensenia-postgres
@@ -15,6 +16,47 @@ services:
       interval: 5s
       timeout: 5s
       retries: 5
+    networks:
+      - ensenia-network
+
+  # Python FastAPI Backend
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: ensenia-backend
+    env_file:
+      - .env
+    environment:
+      # Override database URL to use container hostname
+      DATABASE_URL: postgresql+asyncpg://ensenia:hackathon@postgres:5432/ensenia
+      # Ensure backend waits for postgres
+      POSTGRES_HOST: postgres
+      POSTGRES_PORT: 5432
+    ports:
+      - "8000:8000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    volumes:
+      # Mount cache directory for audio files
+      - audio_cache:/app/cache/audio
+      # Mount app code for development (optional, comment out for production)
+      # - ./app:/app/app
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+    networks:
+      - ensenia-network
+    restart: unless-stopped
 
 volumes:
   postgres_data:
+  audio_cache:
+
+networks:
+  ensenia-network:
+    driver: bridge

@@ -1,0 +1,79 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+.venv/
+venv/
+ENV/
+env/
+pip-log.txt
+pip-delete-this-directory.txt
+.pytest_cache/
+.coverage
+htmlcov/
+*.egg-info/
+dist/
+build/
+
+# Environment
+.env
+.env.local
+.env.*.local
+
+# IDEs
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Git
+.git/
+.gitignore
+.gitattributes
+
+# Documentation
+*.md
+docs/
+DEPLOYMENT.md
+
+# Node modules (worker will be deployed separately)
+node_modules/
+app/worker/node_modules/
+app/web/node_modules/
+
+# Worker files (not needed in Python container)
+app/worker/
+app/web/
+
+# Cache
+cache/
+*.cache
+.ruff_cache/
+
+# Logs
+*.log
+logs/
+
+# Testing
+.pytest_cache/
+.coverage
+htmlcov/
+test-results/
+
+# Database
+*.db
+*.sqlite
+*.sqlite3
+
+# Makefile and scripts
+Makefile
+scripts/
+
+# Docker
+docker-compose.yml
+Dockerfile
+.dockerignore

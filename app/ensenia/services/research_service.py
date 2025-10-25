@@ -1,11 +1,11 @@
-"""Cloudflare Deep Research Service.
+"""Cloudflare Worker Research Service.
 
-Integrates with Cloudflare Workers MCP server to fetch curriculum-aligned
-educational content and research context for chat sessions.
+Integrates with Cloudflare Worker to provide curriculum-aligned
+educational content and research capabilities.
 """
 
 import logging
-from typing import Any
+from typing import Any, Literal
 
 import httpx
 from sqlalchemy import select
@@ -13,6 +13,15 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.ensenia.config import get_settings
 from app.ensenia.database.models import Session as DBSession
+from app.ensenia.models.curriculum import (
+    FetchResponse,
+    GenerateRequest,
+    GenerateResponse,
+    SearchRequest,
+    SearchResponse,
+    ValidateRequest,
+    ValidateResponse,
+)
 
 logger = logging.getLogger(__name__)
 settings = get_settings()
@@ -22,16 +31,23 @@ _http_client: httpx.AsyncClient | None = None
 
 
 def _get_http_client() -> httpx.AsyncClient:
-    """Get or create shared HTTP client.
+    """Get or create shared HTTP client with retries.
 
     Returns:
-        Shared AsyncClient instance
+        Shared AsyncClient instance with retry configuration
 
     """
     global _http_client  # noqa: PLW0603
     if _http_client is None:
-        _http_client = httpx.AsyncClient(timeout=30.0)
-        logger.info("Created shared HTTP client for ResearchService")
+        transport = httpx.AsyncHTTPTransport(retries=settings.cloudflare_max_retries)
+        _http_client = httpx.AsyncClient(
+            timeout=settings.cloudflare_request_timeout,
+            transport=transport,
+        )
+        logger.info(
+            "Created shared HTTP client for ResearchService with %d retries",
+            settings.cloudflare_max_retries,
+        )
     return _http_client
 
 
@@ -45,7 +61,11 @@ async def _close_http_client() -> None:
 
 
 class ResearchService:
-    """Service for Cloudflare Deep Research integration."""
+    """Service for Cloudflare Worker integration.
+
+    Provides curriculum search, content generation, and validation
+    through the deployed Cloudflare Worker.
+    """
 
     def __init__(self):
         """Initialize the research service."""
@@ -53,7 +73,7 @@ class ResearchService:
         self.client = _get_http_client()
 
     def _get_headers(self) -> dict[str, str]:
-        """Get headers for Cloudflare API requests.
+        """Get headers for Worker API requests.
 
         Returns:
             Dict of headers including auth if configured
@@ -65,77 +85,222 @@ class ResearchService:
         }
 
         if settings.cloudflare_api_token:
-            headers["cf-aig-authorization"] = f"Bearer {settings.cloudflare_api_token}"
+            headers["Authorization"] = f"Bearer {settings.cloudflare_api_token}"
 
         return headers
 
     async def search_curriculum(
-        self, query: str, grade: int, subject: str, limit: int = 10
-    ) -> dict[str, Any]:
-        """Search curriculum content via MCP server.
+        self,
+        query: str,
+        grade: int,
+        subject: str,
+        limit: int = 10,
+    ) -> SearchResponse:
+        """Search curriculum content using semantic search.
 
         Args:
             query: Search query
             grade: Grade level (1-12)
-            subject: Subject area
-            limit: Maximum results
+            subject: Subject area (e.g., 'matemáticas')
+            limit: Maximum results to return
 
         Returns:
-            Search results with content IDs and metadata
+            SearchResponse with matching content
 
         Raises:
             httpx.HTTPError: If request fails
+            ValueError: If response validation fails
 
         """
-        endpoint = f"{self.base_url}/mcp/tools/search_curriculum"
+        endpoint = f"{self.base_url}/search"
 
-        payload = {"query": query, "grade": grade, "subject": subject, "limit": limit}
+        request_data = SearchRequest(
+            query=query,
+            grade=grade,
+            subject=subject,
+            limit=limit,
+        )
 
         try:
             response = await self.client.post(
-                endpoint, json=payload, headers=self._get_headers()
+                endpoint,
+                json=request_data.model_dump(),
+                headers=self._get_headers(),
             )
             response.raise_for_status()
-            return response.json()
+
+            data = response.json()
+            return SearchResponse.model_validate(data)
+
         except httpx.HTTPError:
-            logger.exception("Error searching curriculum")
+            logger.exception(
+                "Error searching curriculum: %s",
+                response.text if "response" in locals() else "No response",
+            )
+            raise
+        except Exception:
+            logger.exception("Error parsing search response")
             raise
 
-    async def fetch_content(self, content_ids: list[str]) -> dict[str, Any]:
+    async def fetch_content(self, content_ids: list[str]) -> FetchResponse:
         """Fetch full curriculum content by IDs.
 
         Args:
             content_ids: List of content IDs to retrieve
 
         Returns:
-            Retrieved content with full details
+            FetchResponse with full content details
 
         Raises:
             httpx.HTTPError: If request fails
+            ValueError: If response validation fails
 
         """
-        endpoint = f"{self.base_url}/mcp/tools/fetch_content"
+        endpoint = f"{self.base_url}/fetch"
 
         payload = {"content_ids": content_ids}
 
         try:
             response = await self.client.post(
-                endpoint, json=payload, headers=self._get_headers()
+                endpoint,
+                json=payload,
+                headers=self._get_headers(),
             )
             response.raise_for_status()
-            return response.json()
+
+            data = response.json()
+            return FetchResponse.model_validate(data)
+
         except httpx.HTTPError:
-            logger.exception("Error fetching content")
+            logger.exception(
+                "Error fetching content: %s",
+                response.text if "response" in locals() else "No response",
+            )
+            raise
+        except Exception:
+            logger.exception("Error parsing fetch response")
+            raise
+
+    async def generate_explanation(
+        self,
+        context: str,
+        query: str,
+        grade: int,
+        subject: str,
+        oa_codes: list[str],
+        style: Literal["explanation", "summary", "example"] = "explanation",
+    ) -> GenerateResponse:
+        """Generate educational content using Workers AI.
+
+        Args:
+            context: Context information for generation
+            query: User query or topic
+            grade: Grade level (1-12)
+            subject: Subject area
+            oa_codes: Objetivo de Aprendizaje codes to align with
+            style: Generation style (explanation, summary, or example)
+
+        Returns:
+            GenerateResponse with generated content
+
+        Raises:
+            httpx.HTTPError: If request fails
+            ValueError: If response validation fails
+
+        """
+        endpoint = f"{self.base_url}/generate"
+
+        request_data = GenerateRequest(
+            context=context,
+            query=query,
+            grade=grade,
+            subject=subject,
+            oa_codes=oa_codes,
+            style=style,
+        )
+
+        try:
+            response = await self.client.post(
+                endpoint,
+                json=request_data.model_dump(),
+                headers=self._get_headers(),
+            )
+            response.raise_for_status()
+
+            data = response.json()
+            return GenerateResponse.model_validate(data)
+
+        except httpx.HTTPError:
+            logger.exception(
+                "Error generating content: %s",
+                response.text if "response" in locals() else "No response",
+            )
+            raise
+        except Exception:
+            logger.exception("Error parsing generation response")
+            raise
+
+    async def validate_content(
+        self,
+        content: str,
+        grade: int,
+        subject: str,
+        expected_oa: list[str],
+    ) -> ValidateResponse:
+        """Validate content against Chilean Ministry standards.
+
+        Args:
+            content: Content to validate
+            grade: Target grade level (1-12)
+            subject: Subject area
+            expected_oa: Expected OA codes for validation
+
+        Returns:
+            ValidateResponse with validation results
+
+        Raises:
+            httpx.HTTPError: If request fails
+            ValueError: If response validation fails
+
+        """
+        endpoint = f"{self.base_url}/validate"
+
+        request_data = ValidateRequest(
+            content=content,
+            grade=grade,
+            subject=subject,
+            expected_oa=expected_oa,
+        )
+
+        try:
+            response = await self.client.post(
+                endpoint,
+                json=request_data.model_dump(),
+                headers=self._get_headers(),
+            )
+            response.raise_for_status()
+
+            data = response.json()
+            return ValidateResponse.model_validate(data)
+
+        except httpx.HTTPError:
+            logger.exception(
+                "Error validating content: %s",
+                response.text if "response" in locals() else "No response",
+            )
+            raise
+        except Exception:
+            logger.exception("Error parsing validation response")
             raise
 
     async def get_context(self, topic: str, grade: int, subject: str) -> str:
         """Get research context for a topic.
 
-        Searches curriculum and fetches top results to build context.
+        Searches curriculum and fetches top results to build context string.
 
         Args:
             topic: Topic to research
-            grade: Grade level
+            grade: Grade level (1-12)
             subject: Subject area
 
         Returns:
@@ -148,41 +313,47 @@ class ResearchService:
                 query=topic, grade=grade, subject=subject, limit=5
             )
 
-            # Extract content IDs
-            content_ids = search_results.get("content_ids", [])[:3]
+            # Extract top content IDs
+            content_ids = search_results.content_ids[:3]
 
             if not content_ids:
                 logger.warning("No curriculum content found for topic: %s", topic)
                 return f"Topic: {topic}\nNo specific curriculum content found."
 
             # Fetch detailed content
-            content_data = await self.fetch_content(content_ids)
-            contents = content_data.get("contents", [])
+            fetch_response = await self.fetch_content(content_ids)
+            contents = fetch_response.contents
 
             # Format context
             context_parts = [
                 f"Topic: {topic}",
                 f"Grade: {grade}",
                 f"Subject: {subject}",
+                f"Found {len(contents)} curriculum items",
                 "",
             ]
 
             for i, content in enumerate(contents, 1):
-                context_parts.append(f"Content {i}:")
-                context_parts.append(f"  Title: {content.get('title', 'N/A')}")
-                context_parts.append(
-                    f"  Description: {content.get('description', 'N/A')}"
-                )
-                if content.get("learning_objectives"):
+                context_parts.append(f"Content {i}: {content.title}")
+                context_parts.append(f"  OA: {content.ministry_standard_ref}")
+                context_parts.append(f"  Level: {content.difficulty_level}")
+                if content.learning_objectives:
                     context_parts.append(
-                        f"  Objectives: {', '.join(content['learning_objectives'])}"
+                        f"  Objectives: {', '.join(content.learning_objectives[:2])}"
                     )
+                # Add snippet of content text
+                snippet = (
+                    content.content_text[:200] + "..."
+                    if len(content.content_text) > 200
+                    else content.content_text
+                )
+                context_parts.append(f"  Content: {snippet}")
                 context_parts.append("")
 
             return "\n".join(context_parts)
 
         except Exception:
-            logger.exception("Error getting research context")
+            logger.exception("Error getting research context for topic: %s", topic)
             return f"Topic: {topic}\nError retrieving curriculum content."
 
     async def update_session_context(
