@@ -34,16 +34,34 @@ class Settings(BaseSettings):
     voice_speed_middle: float = 0.95
     voice_speed_high: float = 1.00
 
+    # OpenAI Configuration
+    openai_api_key: str
+    openai_model: str = "gpt-4-turbo-preview"
+    openai_max_tokens: int = 2000
+    openai_temperature: float = 0.4
+
+    # Cloudflare Configuration
+    cloudflare_worker_url: str
+    cloudflare_api_token: str | None = None
+
+    # Database Configuration
+    database_url: str = "postgresql+asyncpg://ensenia:hackathon@localhost:5433/ensenia"
+    database_pool_size: int = 5
+    database_max_overflow: int = 10
+
+    # Chat Configuration
+    chat_context_window: int = 10  # Number of messages to keep in context
+
     # Application Settings
     environment: Literal["development", "production", "hackathon"] = "development"
     debug: bool = False
 
     model_config = SettingsConfigDict(
-        env_file=".env", env_file_encoding="utf-8", case_sensitive=False
+        env_file=".env", env_file_encoding="utf-8", case_sensitive=False, extra="ignore"
     )
 
 
-@lru_cache()
+@lru_cache
 def get_settings() -> Settings:
     """Get cached settings instance.
 
