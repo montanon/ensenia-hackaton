@@ -17,7 +17,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 
-from app.ensenia.api.routes import chat, tts
+from app.ensenia.api.routes import chat, tts, websocket
 from app.ensenia.config import get_settings
 from app.ensenia.database.session import close_db, init_db
 from app.ensenia.services.research_service import cleanup_research_service
@@ -69,6 +69,7 @@ app.add_middleware(
 # Include routers
 app.include_router(tts.router)
 app.include_router(chat.router)
+app.include_router(websocket.router)  # WebSocket routes for real-time chat
 
 # Mount static files for cached audio
 cache_path = Path(settings.cache_dir)
@@ -98,7 +99,11 @@ def root() -> dict[str, Any]:
                 "send_message": "POST /chat/sessions/{id}/messages",
                 "get_session": "GET /chat/sessions/{id}",
                 "trigger_research": "POST /chat/sessions/{id}/research",
+                "update_mode": "PATCH /chat/sessions/{id}/mode",
                 "health": "GET /chat/health",
+            },
+            "websocket": {
+                "chat": "WS /ws/chat/{session_id}",
             },
             "docs": "GET /docs",
         },
