@@ -1,0 +1,147 @@
+
+# Git Worktree Configuration
+# ============================================================================
+# Place this file in the root of your git repository as .git-worktree-config
+# to customize the behavior of the git worktree helper functions.
+#
+# All settings are optional and have sensible defaults.
+# Remove the # at the beginning of a line to activate that setting.
+# ============================================================================
+
+# ============================================================================
+# EDITOR - Preferred code editor to open worktrees in
+# ============================================================================
+# Determines which editor is used when opening worktrees with cwt and swt.
+#
+# Supported editors:
+#   - cursor   (Cursor editor)
+#   - code     (Visual Studio Code)
+#   - vim      (Vim)
+#   - nvim     (Neovim)
+#   - emacs    (Emacs)
+#   - nano     (Nano)
+#   - subl     (Sublime Text)
+#   - atom     (Atom)
+#
+# Default: cursor
+#
+# Examples:
+#   EDITOR=cursor
+#   EDITOR=code
+#   EDITOR=nvim
+#
+EDITOR=cursor
+
+# ============================================================================
+# COPY_FILES - Files to copy to new worktrees
+# ============================================================================
+# Comma-separated list of files to automatically copy from the main repository
+# to newly created worktrees. Useful for environment files, local configs, etc.
+#
+# Default: .env
+#
+# Examples:
+#   COPY_FILES=.env
+#   COPY_FILES=.env,.env.local
+#   COPY_FILES=.env,.env.local,.npmrc,.envrc
+#   COPY_FILES=.env,config/local.json,.secrets
+#
+COPY_FILES=.env
+
+# ============================================================================
+# COPY_DIRS - Directories to copy to new worktrees
+# ============================================================================
+# Comma-separated list of directories to automatically copy from the main
+# repository to newly created worktrees. Useful for editor configs, AI
+# assistant configs, IDE settings, etc.
+#
+# Default: .instrumental,.claude,.cursor
+#
+# Examples:
+#   COPY_DIRS=.claude,.cursor
+#   COPY_DIRS=.instrumental,.claude,.cursor,.vscode
+#   COPY_DIRS=.vscode,.idea,.settings
+#   COPY_DIRS=.claude,.cursor,.github
+#
+COPY_DIRS=.instrumental,.claude,.cursor
+
+# ============================================================================
+# AUTO_OPEN - Automatically open worktrees in editor after creation
+# ============================================================================
+# Controls whether the cwt command automatically opens the newly created
+# worktree in your configured editor. You can always override this with
+# the -n or --no-open flag when running cwt.
+#
+# Valid values: true, false, yes, no, 1, 0
+# Default: true
+#
+# Examples:
+#   AUTO_OPEN=true   # Opens automatically (default)
+#   AUTO_OPEN=false  # Just creates, doesn't open
+#   AUTO_OPEN=yes    # Same as true
+#   AUTO_OPEN=no     # Same as false
+#
+AUTO_OPEN=true
+
+# ============================================================================
+# WORKTREE_PATH - Custom path pattern for worktree location (ADVANCED)
+# ============================================================================
+# Define a custom location pattern for where worktrees should be created.
+# Leave empty (or commented out) to use the default pattern.
+#
+# Default pattern: <parent-dir>/<project-name>-worktrees/<feature-name>
+# Example: If your project is at /Users/you/projects/myapp, worktrees will
+#          be created at /Users/you/projects/myapp-worktrees/<feature-name>
+#
+# Placeholders you can use:
+#   {PROJECT_NAME}  - Name of the current project directory
+#   {FEATURE_NAME}  - Name of the feature/branch being created
+#
+# Security Note: Avoid using special characters like ; & $ ( ) ` in paths.
+#
+# Examples:
+#   # Use default location (recommended)
+#   # WORKTREE_PATH=
+#
+#   # Put all worktrees in a temp directory
+#   # WORKTREE_PATH=/tmp/worktrees/{FEATURE_NAME}
+#
+#   # Centralize all project worktrees in your home directory
+#   # WORKTREE_PATH=~/worktrees/{PROJECT_NAME}/{FEATURE_NAME}
+#
+#   # Use a different parent directory
+#   # WORKTREE_PATH=/workspace/{PROJECT_NAME}-wt/{FEATURE_NAME}
+#
+# WORKTREE_PATH=
+
+# ============================================================================
+# USAGE NOTES
+# ============================================================================
+#
+# 1. This file should be named .git-worktree-config (without .example)
+#
+# 2. Place it in the root of your git repository (same level as .git/)
+#
+# 3. Lines starting with # are comments and will be ignored
+#
+# 4. Whitespace around = is automatically trimmed
+#
+# 5. Empty values will use the defaults
+#
+# 6. You can override any config with environment variables:
+#    export GWT_EDITOR=code
+#    export GWT_AUTO_OPEN=false
+#    cwt my-feature
+#
+# 7. Git ignore considerations:
+#    - Add .git-worktree-config to .gitignore if project-specific
+#    - Commit .git-worktree-config.example to share defaults with team
+#
+# 8. For help with any command, use the -h or --help flag:
+#    cwt --help
+#    dwt --help
+#    lwt --help
+#    swt --help
+#    uwt --help
+#
+# ============================================================================
