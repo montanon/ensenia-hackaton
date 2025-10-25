@@ -7,7 +7,7 @@ Models:
 
 from datetime import UTC, datetime
 
-from sqlalchemy import ForeignKey, Text, func
+from sqlalchemy import DateTime, ForeignKey, Text, func
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 
 
@@ -65,7 +65,10 @@ class Message(Base):
     role: Mapped[str] = mapped_column(nullable=False, index=True)  # user or assistant
     content: Mapped[str] = mapped_column(Text, nullable=False)
     timestamp: Mapped[datetime] = mapped_column(
-        default=lambda: datetime.now(UTC), nullable=False, index=True
+        DateTime(timezone=True),
+        default=lambda: datetime.now(UTC),
+        nullable=False,
+        index=True,
     )
 
     # Relationship to session
