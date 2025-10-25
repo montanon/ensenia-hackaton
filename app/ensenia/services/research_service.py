@@ -17,15 +17,40 @@ from app.ensenia.database.models import Session as DBSession
 logger = logging.getLogger(__name__)
 settings = get_settings()
 
+# Module-level HTTP client (singleton pattern)
+_http_client: httpx.AsyncClient | None = None
+
+
+def _get_http_client() -> httpx.AsyncClient:
+    """Get or create shared HTTP client.
+
+    Returns:
+        Shared AsyncClient instance
+
+    """
+    global _http_client  # noqa: PLW0603
+    if _http_client is None:
+        _http_client = httpx.AsyncClient(timeout=30.0)
+        logger.info("Created shared HTTP client for ResearchService")
+    return _http_client
+
+
+async def _close_http_client() -> None:
+    """Close the shared HTTP client."""
+    global _http_client  # noqa: PLW0603
+    if _http_client is not None:
+        await _http_client.aclose()
+        _http_client = None
+        logger.info("Closed shared HTTP client")
+
 
 class ResearchService:
     """Service for Cloudflare Deep Research integration."""
 
     def __init__(self):
-        """Initialize the research service with HTTP client."""
+        """Initialize the research service."""
         self.base_url = settings.cloudflare_worker_url.rstrip("/")
-        self.timeout = 30.0
-        self.client = httpx.AsyncClient(timeout=self.timeout)
+        self.client = _get_http_client()
 
     def _get_headers(self) -> dict[str, str]:
         """Get headers for Cloudflare API requests.
@@ -196,10 +221,6 @@ class ResearchService:
         logger.info("Updated session %s with research context", session_id)
         return context
 
-    async def close(self) -> None:
-        """Close the HTTP client."""
-        await self.client.aclose()
-
 
 def get_research_service() -> ResearchService:
     """Create a new ResearchService instance.
@@ -209,3 +230,11 @@ def get_research_service() -> ResearchService:
 
     """
     return ResearchService()
+
+
+async def cleanup_research_service() -> None:
+    """Cleanup shared HTTP client.
+
+    Should be called on application shutdown.
+    """
+    await _close_http_client()
