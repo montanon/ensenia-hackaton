@@ -11,8 +11,7 @@
     "type-check": "tsc --noEmit"
   },
   "dependencies": {
-    "@cloudflare/ai": "^1.0.59",
-    "hono": "^4.0.0"
+    "@cloudflare/ai": "^1.0.59"
   },
   "devDependencies": {
     "@cloudflare/vitest-pool-workers": "^0.1.0",

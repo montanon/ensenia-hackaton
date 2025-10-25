@@ -3,29 +3,26 @@ main = "src/index.ts"
 compatibility_date = "2024-01-15"
 node_compat = true
 
-# Account ID - replace with your actual account ID when deploying
-# account_id = "" # TODO: Add your Cloudflare account ID
-
 # Workers AI Binding
 [ai]
 binding = "AI"
 
-# D1 Database Binding
+# D1 Database Binding - Local Development
 [[d1_databases]]
 binding = "DB"
 database_name = "ensenia-curriculum"
-database_id = "local-dev-db" # TODO: Replace with actual DB ID for production
+database_id = "local-db"
 
 # Vectorize Binding
 [[vectorize]]
 binding = "VECTOR_INDEX"
 index_name = "curriculum-embeddings"
 
-# KV Namespace for Caching
+# KV Namespace for Caching - Local Development
 [[kv_namespaces]]
 binding = "SEARCH_CACHE"
-id = "local-dev-kv" # TODO: Replace with actual KV namespace ID for production
-preview_id = "local-dev-kv"
+id = "local-kv"
+preview_id = "local-kv"
 
 # Environment Variables
 [vars]
@@ -36,11 +33,4 @@ VECTOR_DIMENSION = "768"
 CACHE_TTL_HOT = "3600"      # 1 hour for frequent queries
 CACHE_TTL_WARM = "86400"    # 24 hours for regular content
 CACHE_TTL_COLD = "604800"   # 7 days for static data
-
-# Development Configuration
-[env.development]
-vars = { ENVIRONMENT = "development", DEBUG = "true" }
-
-# Production Configuration
-[env.production]
-vars = { ENVIRONMENT = "production", DEBUG = "false" }
+DEBUG = "true"
