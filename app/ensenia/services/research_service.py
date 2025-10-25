@@ -72,7 +72,7 @@ class ResearchService:
     async def search_curriculum(
         self, query: str, grade: int, subject: str, limit: int = 10
     ) -> dict[str, Any]:
-        """Search curriculum content via MCP server.
+        """Search curriculum content via Worker.
 
         Args:
             query: Search query
@@ -87,7 +87,7 @@ class ResearchService:
             httpx.HTTPError: If request fails
 
         """
-        endpoint = f"{self.base_url}/mcp/tools/search_curriculum"
+        endpoint = f"{self.base_url}/search"
 
         payload = {"query": query, "grade": grade, "subject": subject, "limit": limit}
 
@@ -114,7 +114,7 @@ class ResearchService:
             httpx.HTTPError: If request fails
 
         """
-        endpoint = f"{self.base_url}/mcp/tools/fetch_content"
+        endpoint = f"{self.base_url}/fetch"
 
         payload = {"content_ids": content_ids}
 
