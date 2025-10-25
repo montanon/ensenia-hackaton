@@ -1,7 +1,7 @@
 name = "ensenia-ai-search"
 main = "src/index.ts"
 compatibility_date = "2024-01-15"
-node_compat = true
+compatibility_flags = ["nodejs_compat"]
 
 # Account ID - replace with your actual account ID when deploying
 # account_id = "" # TODO: Add your Cloudflare account ID

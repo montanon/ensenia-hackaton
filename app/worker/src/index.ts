@@ -23,6 +23,11 @@ export default {
       return corsPreflightResponse();
     }
 
+    // Root endpoint - API info
+    if (path === '/' && request.method === 'GET') {
+      return handleRoot();
+    }
+
     // Health check endpoint
     if (path === '/health' && request.method === 'GET') {
       return handleHealthCheck(env);
@@ -75,6 +80,30 @@ export default {
     }
   },
 };
+
+/**
+ * Root endpoint
+ * Returns API information
+ */
+function handleRoot(): Response {
+  const apiInfo = {
+    name: 'Ensenia CloudFlare Worker',
+    description: 'AI-powered semantic search for Chilean Education',
+    version: '1.0.0',
+    endpoints: {
+      'GET /': 'API information (this page)',
+      'GET /health': 'Health check',
+      'POST /search': 'Semantic search curriculum content',
+      'POST /fetch': 'Fetch curriculum content by IDs',
+      'POST /generate': 'Generate Chilean-context explanations',
+      'POST /validate': 'Validate content against ministry standards',
+    },
+    documentation: 'See README.md and API_REFERENCE.md',
+    repository: 'https://github.com/ensenia/cloudflare-worker',
+  };
+
+  return jsonResponse(apiInfo);
+}
 
 /**
  * Health check endpoint
