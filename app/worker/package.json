@@ -1,0 +1,26 @@
+{
+  "name": "ensenia-cloudflare-worker",
+  "version": "1.0.0",
+  "description": "Cloudflare Worker for Ensenia AI Search - MCP Server",
+  "main": "src/index.ts",
+  "scripts": {
+    "dev": "wrangler dev",
+    "deploy": "wrangler deploy",
+    "tail": "wrangler tail",
+    "test": "vitest",
+    "type-check": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@cloudflare/ai": "^1.0.59"
+  },
+  "devDependencies": {
+    "@cloudflare/vitest-pool-workers": "^0.1.0",
+    "@cloudflare/workers-types": "^4.20240208.0",
+    "typescript": "^5.3.3",
+    "vitest": "^1.2.0",
+    "wrangler": "^3.28.0"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}
