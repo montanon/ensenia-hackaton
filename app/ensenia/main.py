@@ -8,6 +8,8 @@ Integrates:
 """
 
 import logging
+from collections.abc import AsyncGenerator
+from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import Any
 
@@ -15,8 +17,9 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 
-from app.ensenia.api.routes import tts
+from app.ensenia.api.routes import chat, tts
 from app.ensenia.config import get_settings
+from app.ensenia.database.session import close_db, init_db
 
 # Configure logging
 logging.basicConfig(
@@ -26,13 +29,30 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 settings = get_settings()
 
+
+@asynccontextmanager
+async def lifespan(_: FastAPI) -> AsyncGenerator[None, None]:
+    """Lifespan for the FastAPI application."""
+    logger.info("Starting up...")
+    await init_db()
+    logger.info("Startup complete")
+    yield
+    logger.info("Shutting down...")
+    await close_db()
+    logger.info("Shutdown complete")
+
+
 # Create FastAPI app
 app = FastAPI(
-    title="Chilean Education TTS API",
-    description="Text-to-Speech API for Chilean educational content using ElevenLabs",
+    title="Chilean Education AI Assistant API",
+    description=(
+        "AI-powered teaching assistant for Chilean students "
+        "with TTS and chat capabilities"
+    ),
     version="1.0.0",
     docs_url="/docs",
     redoc_url="/redoc",
+    lifespan=lifespan,
 )
 
 # CORS middleware
@@ -46,6 +66,7 @@ app.add_middleware(
 
 # Include routers
 app.include_router(tts.router)
+app.include_router(chat.router)
 
 # Mount static files for cached audio
 cache_path = Path(settings.cache_dir)
@@ -58,16 +79,25 @@ if cache_path.exists():
 def root() -> dict[str, Any]:
     """Root endpoint with API information."""
     return {
-        "message": "Chilean Education TTS API",
+        "message": "Chilean Education AI Assistant API",
         "version": "1.0.0",
         "status": "running",
         "voice": "Dorothy (Chilean Spanish)",
         "endpoints": {
-            "simple_tts": "GET /tts/speak?text=Hola&grade=5",
-            "advanced_tts": "POST /tts/generate",
-            "streaming": "GET /tts/stream?text=Hola&grade=5",
-            "batch": "POST /tts/batch",
-            "health": "GET /tts/health",
+            "tts": {
+                "simple": "GET /tts/speak?text=Hola&grade=5",
+                "advanced": "POST /tts/generate",
+                "streaming": "GET /tts/stream?text=Hola&grade=5",
+                "batch": "POST /tts/batch",
+                "health": "GET /tts/health",
+            },
+            "chat": {
+                "create_session": "POST /chat/sessions",
+                "send_message": "POST /chat/sessions/{id}/messages",
+                "get_session": "GET /chat/sessions/{id}",
+                "trigger_research": "POST /chat/sessions/{id}/research",
+                "health": "GET /chat/health",
+            },
             "docs": "GET /docs",
         },
     }
