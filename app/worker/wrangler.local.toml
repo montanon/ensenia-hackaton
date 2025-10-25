@@ -1,0 +1,36 @@
+name = "ensenia-ai-search"
+main = "src/index.ts"
+compatibility_date = "2024-01-15"
+node_compat = true
+
+# Workers AI Binding
+[ai]
+binding = "AI"
+
+# D1 Database Binding - Local Development
+[[d1_databases]]
+binding = "DB"
+database_name = "ensenia-curriculum"
+database_id = "local-db"
+
+# Vectorize Binding
+[[vectorize]]
+binding = "VECTOR_INDEX"
+index_name = "curriculum-embeddings"
+
+# KV Namespace for Caching - Local Development
+[[kv_namespaces]]
+binding = "SEARCH_CACHE"
+id = "local-kv"
+preview_id = "local-kv"
+
+# Environment Variables
+[vars]
+ENVIRONMENT = "development"
+EMBEDDING_MODEL = "@cf/baai/bge-base-en-v1.5"
+GENERATION_MODEL = "@cf/meta/llama-3.1-8b-instruct"
+VECTOR_DIMENSION = "768"
+CACHE_TTL_HOT = "3600"      # 1 hour for frequent queries
+CACHE_TTL_WARM = "86400"    # 24 hours for regular content
+CACHE_TTL_COLD = "604800"   # 7 days for static data
+DEBUG = "true"
