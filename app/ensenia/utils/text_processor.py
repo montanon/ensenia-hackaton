@@ -133,7 +133,10 @@ def expand_abbreviations(text: str) -> str:
         "d.C.": "después de Cristo",
     }
 
-    for abbr, full in abbreviations.items():
+    # Sort by length (longest first) to avoid partial replacements
+    for abbr, full in sorted(
+        abbreviations.items(), key=lambda x: len(x[0]), reverse=True
+    ):
         text = text.replace(abbr, full)
 
     return text
