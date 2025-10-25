@@ -1,0 +1,104 @@
+[project]
+name = "ensenia"
+version = "0.1.0"
+description = "Hackaton"
+requires-python = ">=3.12,<3.13"
+dependencies = [
+]
+
+[project.scripts]
+
+
+[dependency-groups]
+dev = [
+    "ruff>=0.8.0",
+    "pytest>=8.0.0",
+    "pytest-asyncio>=0.24.0",
+    "pytest-cov>=4.1.0",
+
+]
+
+[tool.ruff.lint]
+
+select = [
+    "ALL"
+]
+
+ignore = [
+    # Conflicts with formatter, see:
+    # https://docs.astral.sh/ruff/formatter/#conflicting-lint-rules
+    "COM812", "COM819",
+    "D203", "D206", "D213", "D300",
+    "E111", "E114", "E117",
+    "W191",
+    "Q000", "Q001", "Q002", "Q003",
+    "TRY301",
+
+    # to-dos
+    "FIX002",
+    "TD001", "TD002", "TD003",
+
+    # constructors
+    "ANN003", "ANN204", "D107",
+
+    # pydantic runtime types
+    "UP007",
+
+    # unittest
+    "PT009", "PT027",
+
+    # Return at the end of the function
+    "TRY300",
+
+    # All not forcefully sorted
+    "RUF022"
+]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**/*.py" = [
+    "S101",      # Use of assert (required in tests)
+    "ANN001",    # Missing type annotation for function argument (test fixtures)
+    "ANN201",    # Missing return type annotation (test methods)
+    "ANN202",    # Missing return type annotation for private function
+    "SLF001",    # Private member access (needed for testing internals)
+    "PLR2004",   # Magic value comparison (acceptable in tests)
+    "PLR0913",   # Too many arguments (acceptable for test factories)
+    "D104",      # Missing docstring in public package (__init__.py)
+    "EM101",     # Exception string literals (acceptable in tests)
+    "PLC0415",   # Import not at top (sometimes needed for mocking)
+    "TRY003",    # Long exception messages (acceptable in test mocks)
+    "PT012",     # Complex pytest.raises blocks (acceptable in tests)
+]
+
+[build-system]
+requires = ["hatchling", "hatch-vcs"]
+build-backend = "hatchling.build"
+
+[tool.hatch.metadata]
+allow-direct-references = true
+
+[tool.hatch.build.targets.wheel]
+packages = ["app"]
+
+[tool.hatch.build]
+include = [
+    "app/**/*.py",
+]
+
+[tool.hatch.build.targets.sdist]
+include = [
+    "app/**/*.py",
+]
+
+[tool.pytest.ini_options]
+pythonpath = "."
+asyncio_mode = "auto"
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+python_classes = ["Test*"]
+python_functions = ["test_*"]
+timeout = 10
+
+
+markers = [
+]
