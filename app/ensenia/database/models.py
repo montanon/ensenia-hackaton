@@ -6,9 +6,17 @@ Models:
 """
 
 from datetime import UTC, datetime
+from enum import Enum
 
-from sqlalchemy import DateTime, ForeignKey, Text, func
+from sqlalchemy import Boolean, DateTime, Float, ForeignKey, String, Text, func
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
+
+
+class OutputMode(str, Enum):
+    """Enum for message output modes."""
+
+    TEXT = "text"
+    AUDIO = "audio"
 
 
 class Base(DeclarativeBase):
@@ -35,6 +43,14 @@ class Session(Base):
         nullable=False, index=True
     )  # learn/practice/evaluation/study
     research_context: Mapped[str | None] = mapped_column(Text, nullable=True)
+
+    # WebSocket and audio mode support
+    current_mode: Mapped[str] = mapped_column(
+        String(10), nullable=False, default="text", server_default="text"
+    )  # text or audio - current output mode preference
+    ws_connection_id: Mapped[str | None] = mapped_column(
+        String(100), nullable=True
+    )  # WebSocket connection identifier
 
     # Relationship to messages
     messages: Mapped[list["Message"]] = relationship(
@@ -70,6 +86,23 @@ class Message(Base):
         nullable=False,
         index=True,
     )
+
+    # Audio support fields
+    output_mode: Mapped[str] = mapped_column(
+        String(10), nullable=False, default="text", server_default="text"
+    )  # How this message was delivered: text or audio
+    audio_id: Mapped[str | None] = mapped_column(
+        String(100), nullable=True, index=True
+    )  # Reference to cached audio file (hash)
+    audio_url: Mapped[str | None] = mapped_column(
+        String(500), nullable=True
+    )  # CDN/static URL for audio playback
+    audio_available: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, default=False, server_default="false"
+    )  # TTS generation status
+    audio_duration: Mapped[float | None] = mapped_column(
+        Float, nullable=True
+    )  # Audio length in seconds
 
     # Relationship to session
     session: Mapped["Session"] = relationship("Session", back_populates="messages")
