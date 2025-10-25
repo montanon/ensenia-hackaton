@@ -90,12 +90,18 @@ Instrucciones:
 class ChatService:
     """Service for OpenAI chat operations."""
 
-    def __init__(self):
-        """Initialize the OpenAI client."""
+    def __init__(self, db: AsyncSession | None = None):
+        """Initialize the OpenAI client.
+
+        Args:
+            db: Optional databae session (for dependency injection)
+
+        """
         self.client = AsyncOpenAI(api_key=settings.openai_api_key)
         self.model = settings.openai_model
         self.max_tokens = settings.openai_max_tokens
         self.temperature = settings.openai_temperature
+        self.db = db
 
     def _build_system_prompt(
         self, mode: str, grade: int, subject: str, research_context: str | None
@@ -239,6 +245,126 @@ class ChatService:
 
         except Exception:
             logger.exception("Error in chat completion")
+            raise
+
+    async def send_message_streaming(
+        self, session: DBSession, user_message: str, db: AsyncSession
+    ):
+        """Send a message and stream AI response chunks.
+
+        Args:
+            session: The database session object
+            user_message: User's message
+            db: Database session
+
+        Yields:
+            Text chunks from OpenAI streaming response
+
+        """
+        # Build conversation history (last N messages)
+        history = [
+            {"role": msg.role, "content": msg.content}
+            for msg in session.messages[-settings.chat_context_window :]
+        ]
+
+        # Build system prompt
+        system_prompt = self._build_system_prompt(
+            mode=session.mode,
+            grade=session.grade,
+            subject=session.subject,
+            research_context=session.research_context,
+        )
+
+        # Construct messages for OpenAI
+        messages = [
+            {"role": "system", "content": system_prompt},
+            *history,
+            {"role": "user", "content": user_message},
+        ]
+
+        try:
+            # Call OpenAI streaming API
+            logger.info(
+                "Streaming message from OpenAI (session=%s, mode=%s)",
+                session.id,
+                session.mode,
+            )
+
+            stream = await self.client.chat.completions.create(
+                model=self.model,
+                messages=messages,
+                max_tokens=self.max_tokens,
+                temperature=self.temperature,
+                stream=True,
+            )
+
+            async for chunk in stream:
+                if chunk.choices[0].delta.content:
+                    yield chunk.choices[0].delta.content
+
+        except Exception:
+            logger.exception("Error in streaming chat completion")
+            raise
+
+    async def get_session(self, session_id: int) -> DBSession | None:
+        """Get a session by ID with messages loaded.
+
+        Args:
+            session_id: The session ID to fetch
+
+        Returns:
+            Session object or None if not found
+
+        """
+        if not self.db:
+            msg = "Database session not provided to ChatService"
+            raise ValueError(msg)
+
+        stmt = (
+            select(DBSession)
+            .options(selectinload(DBSession.messages))
+            .where(DBSession.id == session_id)
+        )
+
+        result = await self.db.execute(stmt)
+        return result.scalar_one_or_none()
+
+    async def update_session_mode(self, session_id: int, new_mode: str) -> None:
+        """Update a session's current output mode (text/audio).
+
+        Args:
+            session_id: The session ID to update
+            new_mode: The new mode ('text' or 'audio')
+
+        Raises:
+            ValueError: If session not found or invalid mode
+
+        """
+        if not self.db:
+            msg = "Database session not provided to ChatService"
+            raise ValueError(msg)
+
+        if new_mode not in ["text", "audio"]:
+            msg = f"Invalid mode: {new_mode}"
+            raise ValueError(msg)
+
+        stmt = select(DBSession).where(DBSession.id == session_id)
+        result = await self.db.execute(stmt)
+        session = result.scalar_one_or_none()
+
+        if not session:
+            msg = f"Session {session_id} not found"
+            raise ValueError(msg)
+
+        session.current_mode = new_mode
+
+        try:
+            await self.db.commit()
+            msg = f"Session {session_id} mode updated to {new_mode}"
+            logger.info(msg)
+        except Exception:
+            await self.db.rollback()
+            logger.exception(msg)
             raise
 
 
