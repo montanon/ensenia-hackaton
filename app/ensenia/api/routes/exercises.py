@@ -14,9 +14,9 @@ from typing import Annotated
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from ensenia.database.models import Exercise as DBExercise
-from ensenia.database.session import get_db
-from ensenia.schemas.exercises import (
+from app.ensenia.database.models import Exercise as DBExercise
+from app.ensenia.database.session import get_db
+from app.ensenia.schemas.exercises import (
     EssayContent,
     ExerciseListResponse,
     ExerciseResponse,
@@ -31,11 +31,11 @@ from ensenia.schemas.exercises import (
     SubmitAnswerResponse,
     TrueFalseContent,
 )
-from ensenia.services.exercise_repository import (
+from app.ensenia.services.exercise_repository import (
     ExerciseRepository,
     get_exercise_repository,
 )
-from ensenia.services.generation_service import (
+from app.ensenia.services.generation_service import (
     GenerationService,
     get_generation_service,
 )

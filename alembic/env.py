@@ -16,8 +16,8 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "app"))
 
 # Import models - must be imported to register with Base.metadata
 # Import settings
-from ensenia.core.config import settings
-from ensenia.database.models import (  # noqa: F401
+from app.ensenia.core.config import settings
+from app.ensenia.database.models import (  # noqa: F401
     Base,
     Exercise,
     ExerciseSession,

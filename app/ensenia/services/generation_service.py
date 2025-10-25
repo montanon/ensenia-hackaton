@@ -21,8 +21,8 @@ from langgraph.graph import END, StateGraph
 from langgraph.graph.message import add_messages
 from pydantic import BaseModel, Field
 
-from ensenia.core.config import settings
-from ensenia.schemas.exercises import (
+from app.ensenia.core.config import settings
+from app.ensenia.schemas.exercises import (
     DifficultyLevel,
     EssayContent,
     ExerciseType,

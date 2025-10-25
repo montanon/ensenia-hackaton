@@ -11,8 +11,8 @@ from sqlalchemy import and_, desc, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
-from ensenia.database.models import Exercise, ExerciseSession, Session
-from ensenia.schemas.exercises import DifficultyLevel, ExerciseType
+from app.ensenia.database.models import Exercise, ExerciseSession, Session
+from app.ensenia.schemas.exercises import DifficultyLevel, ExerciseType
 
 logger = logging.getLogger(__name__)
 
