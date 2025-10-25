@@ -8,7 +8,6 @@ import { handleSearch } from './routes/search';
 import { handleFetch } from './routes/fetch';
 import { handleGenerate } from './routes/generate';
 import { handleValidate } from './routes/validate';
-import { handleSeed } from './routes/seed';
 import { jsonResponse, errorResponse, corsPreflightResponse } from './utils/responses';
 
 /**
@@ -53,12 +52,6 @@ export default {
         case '/validate':
           if (request.method === 'POST') {
             return await handleValidate(request, env);
-          }
-          break;
-
-        case '/seed':
-          if (request.method === 'POST') {
-            return await handleSeed(request, env);
           }
           break;
 

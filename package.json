@@ -1,0 +1,35 @@
+{
+  "name": "ensenia-root",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Ensenia - Chilean Education AI Assistant",
+  "scripts": {
+    "install:all": "npm run install:worker && npm run install:python",
+    "install:worker": "cd app/worker && npm install",
+    "install:web": "cd app/web && npm install",
+    "install:python": "uv sync",
+
+    "dev:worker": "cd app/worker && npm run dev",
+    "dev:python": "uv run uvicorn ensenia.main:app --reload",
+    "dev:web": "cd app/web && npm run dev",
+
+    "build:worker": "cd app/worker && npm run deploy",
+    "build:python": "uv build",
+
+    "test:worker": "cd app/worker && npm test",
+    "test:python": "uv run pytest",
+
+    "lint:python": "uv run ruff check .",
+    "format:python": "uv run ruff format .",
+
+    "clean": "npm run clean:worker && npm run clean:python",
+    "clean:worker": "cd app/worker && rm -rf node_modules package-lock.json",
+    "clean:python": "rm -rf .venv uv.lock",
+
+    "setup": "npm run install:all && cd app/worker/scripts && ./setup.sh"
+  },
+  "workspaces": [
+    "app/worker",
+    "app/web"
+  ]
+}
