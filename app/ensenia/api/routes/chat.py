@@ -70,6 +70,21 @@ class ResearchResponse(BaseModel):
     context: str
 
 
+class UpdateModeRequest(BaseModel):
+    """Request to update session mode."""
+
+    mode: str = Field(
+        ..., description="New mode: 'text' or 'audio'", pattern="^(text|audio)$"
+    )
+
+
+class UpdateModeResponse(BaseModel):
+    """Response after updating mode."""
+
+    session_id: int
+    mode: str
+
+
 class MessageResponse(BaseModel):
     """Message in conversation history."""
 
@@ -281,6 +296,43 @@ async def get_session(
         raise
     except Exception as e:
         logger.exception("Error getting session")
+        raise HTTPException(status_code=500, detail=str(e)) from e
+
+
+@router.patch("/sessions/{session_id}/mode")
+async def update_session_mode(
+    session_id: int,
+    request: UpdateModeRequest,
+    db: Annotated[AsyncSession, Depends(get_db)],
+) -> UpdateModeResponse:
+    """Update session's output mode (text/audio).
+
+    REST fallback for mode updates (WebSocket clients can use set_mode message).
+
+    Args:
+        session_id: Session ID
+        request: Mode update request
+        db: Database session
+
+    Returns:
+        Updated session mode
+
+    Raises:
+        HTTPException: If session not found or invalid mode
+
+    """
+    try:
+        chat_service = get_chat_service()
+        chat_service.db = db
+
+        await chat_service.update_session_mode(session_id, request.mode)
+
+        return UpdateModeResponse(session_id=session_id, mode=request.mode)
+
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e)) from e
+    except Exception as e:
+        logger.exception("Error updating session mode")
         raise HTTPException(status_code=500, detail=str(e)) from e
 
 
