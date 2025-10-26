@@ -104,6 +104,14 @@ else
     fi
 fi
 
+# Stop PostgreSQL
+if [ -f "$SCRIPT_DIR/db.sh" ]; then
+    log_info "Stopping PostgreSQL..."
+    if "$SCRIPT_DIR/db.sh" stop 2>/dev/null; then
+        STOPPED=$((STOPPED + 1))
+    fi
+fi
+
 echo ""
 if [ $STOPPED -eq 0 ]; then
     log_warning "No services were running"

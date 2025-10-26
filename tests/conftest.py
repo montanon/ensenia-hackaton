@@ -120,7 +120,7 @@ def mock_settings(monkeypatch):
 
     # Database settings
     mock_settings_obj.database_url = (
-        "postgresql+asyncpg://test:test@localhost:5433/test"
+        "postgresql+asyncpg://ensenia:hackathon@localhost:5433/test"
     )
     mock_settings_obj.database_pool_size = 5
     mock_settings_obj.database_max_overflow = 10
@@ -149,7 +149,7 @@ def mock_settings(monkeypatch):
     mock_settings_obj.generation_quality_threshold = 8
     mock_settings_obj.generation_model = "gpt-4-turbo-preview"
     mock_settings_obj.database_url = (
-        "postgresql+asyncpg://test:test@localhost:5433/test"
+        "postgresql+asyncpg://ensenia:hackathon@localhost:5433/test"
     )
     mock_settings_obj.cloudflare_worker_url = "http://localhost:8787"
     mock_settings_obj.cache_dir = "./test_cache"

@@ -17,7 +17,7 @@ MODE="${1:-development}"
 
 echo -e "${BLUE}╔════════════════════════════════════════╗${NC}"
 echo -e "${BLUE}║   Ensenia - Deployment Script         ║${NC}"
-echo -e "${BLUE}║   Mode: ${MODE^^}${NC}                          ${BLUE}║${NC}"
+echo -e "${BLUE}║   Mode: $(echo $MODE | tr '[:lower:]' '[:upper:]')${NC}"
 echo -e "${BLUE}╚════════════════════════════════════════╝${NC}"
 echo ""
 
@@ -160,30 +160,45 @@ echo ""
 log_info "Setting up PostgreSQL database..."
 echo ""
 
-# Check if database exists
-if command -v psql &> /dev/null; then
-    if PGPASSWORD="$DB_PASSWORD" psql -h "$DB_HOST" -p "$DB_PORT" -U "$DB_USER" -lqt 2>/dev/null | cut -d \| -f 1 | grep -qw "$DB_NAME"; then
-        log_success "Database '$DB_NAME' exists"
-    else
-        log_warning "Database '$DB_NAME' does not exist. Creating..."
-        if PGPASSWORD="$DB_PASSWORD" createdb -h "$DB_HOST" -p "$DB_PORT" -U "$DB_USER" "$DB_NAME" 2>/dev/null; then
-            log_success "Database created"
-        else
-            log_error "Failed to create database. May need manual setup."
-        fi
-    fi
-else
-    log_warning "PostgreSQL client not available. Skipping database check."
-fi
+# Use db.sh script for database management
+if [ -f "$SCRIPT_DIR/db.sh" ]; then
+    # Start PostgreSQL via Docker
+    log_info "Starting PostgreSQL via Docker..."
+    "$SCRIPT_DIR/db.sh" start
 
-# Run Alembic migrations
-log_info "Running database migrations..."
-cd "$BACKEND_DIR"
-if uv run alembic upgrade head; then
-    log_success "Database migrations completed"
+    # Set up databases and run migrations
+    log_info "Setting up databases and running migrations..."
+    "$SCRIPT_DIR/db.sh" setup
+
+    log_success "Database setup complete via db.sh"
 else
-    log_error "Database migrations failed!"
-    exit 1
+    log_warning "db.sh not found, using manual setup..."
+
+    # Fallback to manual setup
+    if command -v psql &> /dev/null; then
+        if PGPASSWORD="$DB_PASSWORD" psql -h "$DB_HOST" -p "$DB_PORT" -U "$DB_USER" -lqt 2>/dev/null | cut -d \| -f 1 | grep -qw "$DB_NAME"; then
+            log_success "Database '$DB_NAME' exists"
+        else
+            log_warning "Database '$DB_NAME' does not exist. Creating..."
+            if PGPASSWORD="$DB_PASSWORD" createdb -h "$DB_HOST" -p "$DB_PORT" -U "$DB_USER" "$DB_NAME" 2>/dev/null; then
+                log_success "Database created"
+            else
+                log_error "Failed to create database. May need manual setup."
+            fi
+        fi
+    else
+        log_warning "PostgreSQL client not available. Skipping database check."
+    fi
+
+    # Run Alembic migrations
+    log_info "Running database migrations..."
+    cd "$BACKEND_DIR"
+    if uv run alembic upgrade head; then
+        log_success "Database migrations completed"
+    else
+        log_error "Database migrations failed!"
+        exit 1
+    fi
 fi
 
 echo ""
