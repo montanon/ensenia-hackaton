@@ -201,22 +201,22 @@ async def search_exercises(
     db: Annotated[AsyncSession, Depends(get_db)],
     repository: Annotated[ExerciseRepository, Depends(get_exercise_repository)],
     grade: Annotated[
-        int | None, Query(None, ge=1, le=12, description="Grade level filter")
+        int | None, Query(ge=1, le=12, description="Grade level filter")
     ] = None,
     subject: Annotated[
-        str | None, Query(None, max_length=100, description="Subject filter")
+        str | None, Query(max_length=100, description="Subject filter")
     ] = None,
     topic: Annotated[
-        str | None, Query(None, max_length=200, description="Topic filter")
+        str | None, Query(max_length=200, description="Topic filter")
     ] = None,
     exercise_type: Annotated[
-        ExerciseType | None, Query(None, description="Exercise type filter")
+        ExerciseType | None, Query(description="Exercise type filter")
     ] = None,
     difficulty_level: Annotated[
-        DifficultyLevel | None, Query(None, description="Difficulty level filter")
+        DifficultyLevel | None, Query(description="Difficulty level filter")
     ] = None,
     limit: Annotated[
-        int, Query(10, ge=1, le=100, description="Maximum number of results")
+        int, Query(ge=1, le=100, description="Maximum number of results")
     ] = 10,
 ) -> ExerciseListResponse:
     """Search for existing reusable exercises.

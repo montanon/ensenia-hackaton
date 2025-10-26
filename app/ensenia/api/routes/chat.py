@@ -186,10 +186,10 @@ async def initialize_session_background(
             msg = f"[Background] Session {session_id} initialization complete"
             logger.info(msg)
 
-    except Exception as e:
+    except Exception:
         msg = f"[Background] Fatal error in session {session_id} initialization"
         logger.exception(msg)
-        raise Exception(msg) from e
+        # Don't raise - background tasks should fail silently to avoid crashing
 
 
 # Endpoints

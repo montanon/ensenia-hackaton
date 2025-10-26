@@ -108,6 +108,38 @@ export const SessionInitializingView: React.FC = () => {
         </div>
       </div>
 
+      {/* Exercise Cards Animation */}
+      {initStatus.research_loaded && !initStatus.initial_exercises_ready && (
+        <div className="w-full max-w-md">
+          <p className="text-sm font-medium text-gray-700 mb-3 text-center">
+            Preparando ejercicios personalizados...
+          </p>
+          <div className="grid grid-cols-5 gap-2">
+            {[0, 1, 2, 3, 4].map((index) => (
+              <div
+                key={index}
+                className={`aspect-square rounded-lg border-2 transition-all duration-500 flex items-center justify-center ${
+                  index < initStatus.exercise_count
+                    ? 'border-green-500 bg-green-50 scale-100 opacity-100'
+                    : 'border-gray-200 bg-gray-50 scale-95 opacity-50'
+                }`}
+                style={{
+                  transitionDelay: `${index * 100}ms`,
+                }}
+              >
+                {index < initStatus.exercise_count ? (
+                  <svg className="w-6 h-6 text-green-600 animate-bounce" fill="currentColor" viewBox="0 0 20 20" style={{ animationDelay: `${index * 100}ms` }}>
+                    <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                  </svg>
+                ) : (
+                  <div className="w-2 h-2 bg-gray-300 rounded-full animate-pulse" style={{ animationDelay: `${index * 150}ms` }} />
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
       {/* Info Message */}
       <p className="text-center text-sm text-gray-600 max-w-md">
         Esto puede tomar un momento mientras el sistema realiza la investigación profunda con inteligencia artificial.

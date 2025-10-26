@@ -69,7 +69,7 @@ class TTSResponse(BaseModel):
 async def text_to_speech_simple(
     service: ServiceDep,
     text: Annotated[
-        str, Query(description="Text to convert to speech", max_length=5000)
+        str, Query(..., description="Text to convert to speech", max_length=5000)
     ],
     grade: Annotated[int, Query(ge=1, le=12, description="Grade level (1-12)")] = 5,
 ) -> Response:
@@ -166,7 +166,7 @@ async def text_to_speech_advanced(service: ServiceDep, request: TTSRequest) -> R
 async def text_to_speech_stream(
     service: ServiceDep,
     text: Annotated[
-        str, Query(description="Text to convert to speech", max_length=5000)
+        str, Query(..., description="Text to convert to speech", max_length=5000)
     ],
     grade: Annotated[int, Query(ge=1, le=12, description="Grade level (1-12)")] = 5,
 ) -> StreamingResponse:
