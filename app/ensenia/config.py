@@ -13,7 +13,7 @@ class Settings(BaseSettings):
     """Application settings loaded from environment variables."""
 
     # ElevenLabs API Configuration
-    elevenlabs_api_key: str
+    elevenlabs_api_key: str = ""  # Required for TTS, optional for testing
     elevenlabs_voice_id: str = "pNInz6obpgDQGcFmaJgB"  # Dorothy - Chilean Spanish
     elevenlabs_model_id: str = "eleven_turbo_v2_5"
 
@@ -35,13 +35,13 @@ class Settings(BaseSettings):
     voice_speed_high: float = 1.00
 
     # OpenAI Configuration
-    openai_api_key: str
+    openai_api_key: str = ""  # Required for chat, optional for testing
     openai_model: str = "gpt-4-turbo-preview"
     openai_max_tokens: int = 2000
     openai_temperature: float = 0.4
 
     # Cloudflare Configuration
-    cloudflare_worker_url: str
+    cloudflare_worker_url: str = "http://localhost:8787"
     cloudflare_api_token: str | None = None
     cloudflare_request_timeout: int = 30  # seconds
     cloudflare_max_retries: int = 3
