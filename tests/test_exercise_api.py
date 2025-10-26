@@ -146,7 +146,7 @@ class TestSearchExercisesEndpoint:
 
     async def test_search_all_exercises(self, async_client, sample_api_exercise):
         """Test searching all exercises."""
-        response = await async_client.post("/exercises/search", json={})
+        response = await async_client.get("/exercises")
 
         assert response.status_code == 200
         data = response.json()
@@ -156,7 +156,7 @@ class TestSearchExercisesEndpoint:
 
     async def test_search_by_grade(self, async_client, sample_api_exercise):
         """Test searching exercises by grade."""
-        response = await async_client.post("/exercises/search", json={"grade": 8})
+        response = await async_client.get("/exercises", params={"grade": 8})
 
         assert response.status_code == 200
         data = response.json()
@@ -164,8 +164,8 @@ class TestSearchExercisesEndpoint:
 
     async def test_search_by_subject(self, async_client, sample_api_exercise):
         """Test searching exercises by subject."""
-        response = await async_client.post(
-            "/exercises/search", json={"subject": "Matemáticas"}
+        response = await async_client.get(
+            "/exercises", params={"subject": "Matemáticas"}
         )
 
         assert response.status_code == 200
@@ -174,7 +174,7 @@ class TestSearchExercisesEndpoint:
 
     async def test_search_with_limit(self, async_client, sample_api_exercise):
         """Test search with limit parameter."""
-        response = await async_client.post("/exercises/search", json={"limit": 5})
+        response = await async_client.get("/exercises", params={"limit": 5})
 
         assert response.status_code == 200
         data = response.json()
@@ -182,7 +182,7 @@ class TestSearchExercisesEndpoint:
 
     def test_search_invalid_limit(self, client):
         """Test search with invalid limit."""
-        response = client.post("/exercises/search", json={"limit": 100})  # Too high
+        response = client.get("/exercises", params={"limit": 101})  # Too high
 
         assert response.status_code == 422
 
