@@ -30,6 +30,15 @@ interface PopulateVectorizeResponse {
 
 describe('Admin: Populate Vectorize', () => {
   let env: Env;
+  const endpoint = 'http://test.com/admin/populate-vectorize';
+
+  const makeAuthedRequest = () =>
+    new Request(endpoint, {
+      method: 'POST',
+      headers: {
+        'x-admin-token': env.ADMIN_API_TOKEN ?? 'test-admin-token',
+      },
+    });
 
   beforeEach(() => {
     env = createMockEnv();
@@ -80,9 +89,7 @@ describe('Admin: Populate Vectorize', () => {
 
   describe('Success Cases', () => {
     it('should fetch all curriculum content from D1', async () => {
-      const request = new Request('http://test.com/admin/populate-vectorize', {
-        method: 'POST',
-      });
+      const request = makeAuthedRequest();
 
       const response = await handlePopulateVectorize(request, env);
       expect(response.status).toBe(200);
@@ -101,9 +108,7 @@ describe('Admin: Populate Vectorize', () => {
         return { shape: [1, 768], data: [[...Array(768)].map(() => Math.random())] };
       }) as any;
 
-      const request = new Request('http://test.com/admin/populate-vectorize', {
-        method: 'POST',
-      });
+      const request = makeAuthedRequest();
 
       await handlePopulateVectorize(request, env);
       expect(aiCallCount).toBe(2); // One for each content item
@@ -120,9 +125,7 @@ describe('Admin: Populate Vectorize', () => {
         } as VectorizeMutation;
       };
 
-      const request = new Request('http://test.com/admin/populate-vectorize', {
-        method: 'POST',
-      });
+      const request = makeAuthedRequest();
 
       await handlePopulateVectorize(request, env);
 
@@ -151,9 +154,7 @@ describe('Admin: Populate Vectorize', () => {
         return { shape: [1, 768], data: [[...Array(768)].map(() => Math.random())] };
       }) as any;
 
-      const request = new Request('http://test.com/admin/populate-vectorize', {
-        method: 'POST',
-      });
+      const request = makeAuthedRequest();
 
       await handlePopulateVectorize(request, env);
 
@@ -165,9 +166,7 @@ describe('Admin: Populate Vectorize', () => {
     });
 
     it('should return success count', async () => {
-      const request = new Request('http://test.com/admin/populate-vectorize', {
-        method: 'POST',
-      });
+      const request = makeAuthedRequest();
 
       const response = await handlePopulateVectorize(request, env);
       const body = await response.json() as PopulateVectorizeResponse;
@@ -177,9 +176,7 @@ describe('Admin: Populate Vectorize', () => {
     });
 
     it('should include processing time', async () => {
-      const request = new Request('http://test.com/admin/populate-vectorize', {
-        method: 'POST',
-      });
+      const request = makeAuthedRequest();
 
       const response = await handlePopulateVectorize(request, env);
       const body = await response.json() as PopulateVectorizeResponse;
@@ -190,9 +187,7 @@ describe('Admin: Populate Vectorize', () => {
     });
 
     it('should include item details in response', async () => {
-      const request = new Request('http://test.com/admin/populate-vectorize', {
-        method: 'POST',
-      });
+      const request = makeAuthedRequest();
 
       const response = await handlePopulateVectorize(request, env);
       const body = await response.json() as PopulateVectorizeResponse;
@@ -205,6 +200,11 @@ describe('Admin: Populate Vectorize', () => {
       expect(firstItem.title).toBe('Números hasta el millón');
       expect(firstItem.status).toBe('success');
     });
+    it('should reject requests without admin token', async () => {
+      const unauthenticatedRequest = new Request(endpoint, { method: 'POST' });
+      const response = await handlePopulateVectorize(unauthenticatedRequest, env);
+      expect(response.status).toBe(401);
+    });
   });
 
   describe('Error Handling', () => {
@@ -216,9 +216,7 @@ describe('Admin: Populate Vectorize', () => {
         }),
       }) as any;
 
-      const request = new Request('http://test.com/admin/populate-vectorize', {
-        method: 'POST',
-      });
+      const request = makeAuthedRequest();
 
       const response = await handlePopulateVectorize(request, env);
       expect(response.status).toBe(500);
@@ -236,9 +234,7 @@ describe('Admin: Populate Vectorize', () => {
         }),
       }) as any;
 
-      const request = new Request('http://test.com/admin/populate-vectorize', {
-        method: 'POST',
-      });
+      const request = makeAuthedRequest();
 
       const response = await handlePopulateVectorize(request, env);
       expect(response.status).toBe(400);
@@ -252,9 +248,7 @@ describe('Admin: Populate Vectorize', () => {
         throw new Error('AI service unavailable');
       };
 
-      const request = new Request('http://test.com/admin/populate-vectorize', {
-        method: 'POST',
-      });
+      const request = makeAuthedRequest();
 
       const response = await handlePopulateVectorize(request, env);
       const body = await response.json() as PopulateVectorizeResponse;

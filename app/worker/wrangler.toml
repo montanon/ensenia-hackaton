@@ -36,6 +36,7 @@ VECTOR_DIMENSION = "1024"  # Updated to match your Vectorize index
 CACHE_TTL_HOT = "3600"      # 1 hour for frequent queries
 CACHE_TTL_WARM = "86400"    # 24 hours for regular content
 CACHE_TTL_COLD = "604800"   # 7 days for static data
+ADMIN_API_TOKEN = "hackathon-admin-202asdfasd"
 
 # Development Configuration
 [env.development]

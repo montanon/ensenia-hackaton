@@ -7,7 +7,7 @@ from unittest.mock import MagicMock
 import pytest
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.ensenia.database.session import close_db, init_db
+from app.ensenia.database.session import close_db, init_db, reset_engine
 
 
 @pytest.fixture
@@ -41,20 +41,16 @@ async def setup_database():
 
 
 @pytest.fixture(autouse=True)
-async def reset_db_engine():
+async def reset_db_engine(mock_settings):
     """Reset the database engine before and after each test.
 
     This ensures the engine is not tied to a stale event loop.
     """
-    # Dispose before test to ensure clean state
-    from app.ensenia.database.session import engine
-
-    await engine.dispose()
+    await reset_engine()
 
     yield
 
-    # Dispose after test to clean up
-    await engine.dispose()
+    await reset_engine()
 
 
 @pytest.fixture
