@@ -1,0 +1,73 @@
+name: CI
+
+on:
+  pull_request:
+    branches:
+      - main
+
+jobs:
+  validate-branch:
+    name: Validate PR Source Branch
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check PR is from dev branch
+        if: github.head_ref != 'dev'
+        run: |
+          echo "Error: Pull requests to main must come from dev branch"
+          echo "Current source branch: ${{ github.head_ref }}"
+          exit 1
+
+  lint-and-test:
+    name: Lint and Test
+    runs-on: ubuntu-latest
+    needs: validate-branch
+
+    services:
+      postgres:
+        image: postgres:15
+        env:
+          POSTGRES_USER: ensenia
+          POSTGRES_PASSWORD: hackathon
+          POSTGRES_DB: ensenia
+        ports:
+          - 5433:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v3
+        with:
+          version: "latest"
+
+      - name: Install dependencies
+        run: |
+          uv sync --all-groups
+
+      - name: Run database migrations
+        run: |
+          uv run alembic upgrade head
+        env:
+          DATABASE_URL: postgresql+asyncpg://ensenia:hackathon@localhost:5433/ensenia
+
+      - name: Run ruff linting
+        run: |
+          uv run ruff check .
+
+      - name: Run ruff formatting check
+        run: |
+          uv run ruff format --check .
+
+      - name: Run tests
+        run: |
+          uv run pytest tests/ -v
