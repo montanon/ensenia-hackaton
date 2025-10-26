@@ -83,7 +83,8 @@ class TestWorkerIntegration:
             # Verify HTTP call
             mock_http.post.assert_called_once()
             call_args = mock_http.post.call_args
-            assert "https://test-worker.workers.dev/search" in str(call_args)
+            # Should call the /search endpoint (URL comes from config)
+            assert "/search" in str(call_args)
 
     async def test_search_curriculum_validation_error(self):
         """Test search with invalid response schema raises error."""
