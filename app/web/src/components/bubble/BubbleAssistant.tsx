@@ -5,6 +5,7 @@ import { useSessionStore } from '../../stores/sessionStore';
 import { speechRecognitionService } from '../../services/speech';
 import { websocketService } from '../../services/websocket';
 import { cn } from '../../utils/helpers';
+import microphoneIcon from '../../assets/microphone.svg';
 import './bubble-animations.css';
 
 export const BubbleAssistant: React.FC = () => {
@@ -110,7 +111,7 @@ export const BubbleAssistant: React.FC = () => {
   const bubbleState = getBubbleState();
 
   return (
-    <div className="fixed bottom-6 right-6 z-50 flex flex-col items-end gap-2">
+    <div className="fixed bottom-6 right-6 z-50 flex flex-col items-center gap-2">
       {/* Live Transcript */}
       {transcript && (
         <div className="max-w-xs p-3 bg-white border border-gray-200 rounded-lg shadow-lg mb-2 bubble-transcript">
@@ -129,20 +130,36 @@ export const BubbleAssistant: React.FC = () => {
         className={cn(
           'bubble-assistant',
           `bubble-${bubbleState}`,
-          'w-16 h-16 rounded-full bg-gradient-to-br from-blue-500 to-blue-600',
+          'w-20 h-20 bg-gradient-to-br from-blue-500 to-blue-600',
           'shadow-lg hover:shadow-xl transition-all cursor-pointer',
-          'flex items-center justify-center text-3xl',
+          'flex items-center justify-center',
           'focus:outline-none focus:ring-4 focus:ring-blue-300',
+          'relative overflow-hidden',
           isChatOpen && 'opacity-0 scale-0'
         )}
         aria-label={isChatOpen ? 'Close assistant' : 'Open assistant'}
+        style={{ willChange: 'transform, border-radius' }}
       >
-        {isListening ? '🔴' : isSpeaking ? '📢' : '🎤'}
+        {/* Glow effect for listening */}
+        {isListening && (
+          <div className="absolute inset-0 bg-red-400 opacity-30 animate-pulse" />
+        )}
+
+        {/* Icon */}
+        <img
+          src={microphoneIcon}
+          alt="Microphone"
+          className={cn(
+            'w-10 h-10 relative z-10',
+            isListening && 'scale-110 animate-pulse',
+            isSpeaking && 'scale-105'
+          )}
+        />
       </button>
 
       {/* Status indicator */}
       {!isChatOpen && (
-        <div className="text-xs text-gray-600 bg-white px-2 py-1 rounded shadow-sm">
+        <div className="text-xs text-gray-600 bg-white px-3 py-1.5 rounded-full shadow-sm text-center">
           {isListening
             ? 'Escuchando...'
             : isSpeaking

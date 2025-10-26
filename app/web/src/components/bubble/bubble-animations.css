@@ -32,6 +32,22 @@
   }
 }
 
+/* Organic wavy border animation */
+@keyframes wavy-border {
+  0%, 100% {
+    border-radius: 60% 40% 30% 70% / 60% 30% 70% 40%;
+  }
+  25% {
+    border-radius: 30% 60% 70% 40% / 50% 60% 30% 60%;
+  }
+  50% {
+    border-radius: 50% 60% 30% 60% / 30% 60% 70% 40%;
+  }
+  75% {
+    border-radius: 60% 40% 60% 30% / 70% 30% 60% 40%;
+  }
+}
+
 /* Pulse animation for listening state */
 @keyframes listening-pulse {
   0%, 100% {
@@ -69,18 +85,20 @@
 /* Apply animations based on bubble state */
 .bubble-assistant {
   transition: all 0.2s ease;
+  /* Always animate the wavy border */
+  animation: wavy-border 8s ease-in-out infinite;
 }
 
 .bubble-speaking {
-  animation: bouncy-wiggle 0.8s ease-in-out infinite;
+  animation: bouncy-wiggle 0.8s ease-in-out infinite, wavy-border 6s ease-in-out infinite;
 }
 
 .bubble-listening {
-  animation: listening-pulse 1.5s ease-in-out infinite;
+  animation: listening-pulse 1.5s ease-in-out infinite, wavy-border 4s ease-in-out infinite;
 }
 
 .bubble-idle {
-  animation: gentle-float 3s ease-in-out infinite;
+  animation: gentle-float 3s ease-in-out infinite, wavy-border 8s ease-in-out infinite;
 }
 
 .bubble-transcript {
