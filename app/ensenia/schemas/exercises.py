@@ -7,7 +7,7 @@ Follows Chilean Ministry of Education curriculum alignment requirements.
 from datetime import datetime
 from enum import Enum
 
-from pydantic import BaseModel, Field, ValidationInfo, field_validator
+from pydantic import BaseModel, ConfigDict, Field, ValidationInfo, field_validator
 
 
 class ExerciseType(str, Enum):
@@ -231,7 +231,9 @@ class ValidationResult(BaseModel):
     """Validation result from agent-validator loop."""
 
     score: int = Field(..., ge=0, le=10, description="Quality score (0-10)")
+    breakdown: dict[str, int] = Field(..., description="Score breakdown by criteria")
     feedback: str = Field(..., description="Validation feedback")
+    recommendation: str = Field(..., description="Recommendation (APROBAR/REVISAR)")
     is_approved: bool = Field(
         ..., description="Whether the exercise meets quality threshold"
     )
@@ -254,10 +256,7 @@ class ExerciseResponse(BaseModel):
     is_public: bool = Field(..., description="Whether exercise can be reused")
     created_at: datetime = Field(..., description="When the exercise was created")
 
-    class Config:
-        """Pydantic config."""
-
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class ExerciseListResponse(BaseModel):
