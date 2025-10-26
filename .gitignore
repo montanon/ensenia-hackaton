@@ -1,13 +1,226 @@
+data/
+
+.env
+cache/
+.DS_Store
+# ============================================================================
+# Documentation & Logs
+# ============================================================================
 docs/
 .claude_logs/
 
-# Python-generated files
+# ============================================================================
+# Python (uv)
+# ============================================================================
+
+# Byte-compiled / optimized / DLL files
 __pycache__/
-*.py[oc]
+*.py[cod]
+*$py.class
+
+# Distribution / packaging
 build/
 dist/
 wheels/
-*.egg-info
+*.egg-info/
+*.egg
+.eggs/
 
 # Virtual environments
-.venv
+.venv/
+venv/
+ENV/
+env/
+
+# Python lock files
+uv.lock
+
+# PyInstaller
+*.manifest
+*.spec
+
+# Unit test / coverage reports
+htmlcov/
+.tox/
+.coverage
+.coverage.*
+.cache
+.pytest_cache/
+nosetests.xml
+coverage.xml
+*.cover
+.hypothesis/
+
+# mypy
+.mypy_cache/
+.dmypy.json
+dmypy.json
+
+# Pyre type checker
+.pyre/
+
+# Ruff cache
+.ruff_cache/
+
+# ============================================================================
+# Node.js / TypeScript
+# ============================================================================
+
+# Dependencies
+node_modules/
+jspm_packages/
+
+# Lock files (commit package-lock.json, but ignore others)
+# package-lock.json is kept for reproducibility
+# yarn.lock
+# pnpm-lock.yaml
+
+# Build outputs
+dist/
+build/
+.next/
+out/
+
+# TypeScript
+*.tsbuildinfo
+tsconfig.tsbuildinfo
+
+# Testing
+coverage/
+.nyc_output/
+
+# Cache
+.npm
+.eslintcache
+.node_repl_history
+
+# Misc
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# ============================================================================
+# CloudFlare Worker Specific
+# ============================================================================
+
+# Wrangler
+.wrangler/
+.dev.vars
+wrangler.toml.bak
+
+# Worker build artifacts
+worker-build/
+
+# ============================================================================
+# Environment & Secrets
+# ============================================================================
+
+# Environment files
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# Keep sample env files
+!.env.sample
+!.env.example
+
+# API keys and secrets
+secrets/
+*.key
+*.pem
+
+# ============================================================================
+# IDE & Editors
+# ============================================================================
+
+# VSCode
+.vscode/
+!.vscode/settings.json
+!.vscode/tasks.json
+!.vscode/launch.json
+!.vscode/extensions.json
+*.code-workspace
+
+# PyCharm / IntelliJ
+.idea/
+*.iml
+*.iws
+*.ipr
+
+# Sublime Text
+*.sublime-project
+*.sublime-workspace
+
+# Vim
+*.swp
+*.swo
+*~
+
+# Emacs
+*~
+\#*\#
+
+# ============================================================================
+# Operating System
+# ============================================================================
+
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+._*
+
+# Windows
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+$RECYCLE.BIN/
+
+# Linux
+*~
+
+# ============================================================================
+# Temporary & Cache Files
+# ============================================================================
+
+# Temporary files
+tmp/
+temp/
+*.tmp
+*.bak
+*.swp
+
+# ============================================================================
+# Project Specific
+# ============================================================================
+
+# Database files (local development)
+*.db
+*.sqlite
+*.sqlite3
+
+# Audio files (generated)
+audio/
+*.mp3
+*.wav
+
+# Uploads
+uploads/
+
+# ============================================================================
+# Keep These Files
+# ============================================================================
+
+# Keep important config files
+!pyproject.toml
+!package.json
+!tsconfig.json
+!wrangler.toml
+
+# Keep documentation
+!README.md
+!CLAUDE.md
+!*.md
