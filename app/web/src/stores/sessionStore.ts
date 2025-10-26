@@ -1,12 +1,21 @@
 import { create } from 'zustand';
 import type { Session, SessionMode, IOMode, CurrentMode } from '../types/session';
 
+interface InitStatus {
+  research_loaded: boolean;
+  initial_exercises_ready: boolean;
+  exercise_count: number;
+}
+
 interface SessionStore {
   currentSession: Session | null;
   sessionHistory: Session[];
   mode: SessionMode;
   inputMode: IOMode;
   outputMode: IOMode;
+  isInitializing: boolean;
+  initStatus: InitStatus;
+  initError: string | null;
 
   setCurrentSession: (session: Session) => void;
   addToHistory: (session: Session) => void;
@@ -17,6 +26,9 @@ interface SessionStore {
   setOutputMode: (mode: IOMode) => void;
   getCurrentMode: () => CurrentMode;
   clearSession: () => void;
+  setInitializing: (isInitializing: boolean) => void;
+  setInitStatus: (status: InitStatus) => void;
+  setInitError: (error: string | null) => void;
 }
 
 export const useSessionStore = create<SessionStore>((set, get) => ({
@@ -25,6 +37,13 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
   mode: 'learn',
   inputMode: 'text',
   outputMode: 'text',
+  isInitializing: false,
+  initStatus: {
+    research_loaded: false,
+    initial_exercises_ready: false,
+    exercise_count: 0,
+  },
+  initError: null,
 
   setCurrentSession: (session) => set({ currentSession: session }),
 
@@ -51,5 +70,20 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
     return outputMode === 'voice' ? 'audio' : 'text';
   },
 
-  clearSession: () => set({ currentSession: null }),
+  clearSession: () => set({
+    currentSession: null,
+    isInitializing: false,
+    initStatus: {
+      research_loaded: false,
+      initial_exercises_ready: false,
+      exercise_count: 0,
+    },
+    initError: null,
+  }),
+
+  setInitializing: (isInitializing) => set({ isInitializing }),
+
+  setInitStatus: (status) => set({ initStatus: status }),
+
+  setInitError: (error) => set({ initError: error }),
 }));

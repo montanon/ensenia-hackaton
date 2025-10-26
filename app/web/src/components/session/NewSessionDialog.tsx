@@ -9,6 +9,8 @@ import { useSessionStore } from '../../stores/sessionStore';
 import { useChatStore } from '../../stores/chatStore';
 import { useExerciseStore } from '../../stores/exerciseStore';
 
+const MAX_POLLS = 60; // 60 polls × 2 seconds = 2 minutes max
+
 interface NewSessionDialogProps {
   isOpen: boolean;
   onClose: () => void;
@@ -19,29 +21,37 @@ export const NewSessionDialog: React.FC<NewSessionDialogProps> = ({ isOpen, onCl
   const [subject, setSubject] = useState('Matemáticas');
   const [mode, setMode] = useState<SessionMode>('learn');
   const [topic, setTopic] = useState('');
-  const [loading, setLoading] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
 
-  // Initialization tracking
-  const [createdSessionId, setCreatedSessionId] = useState<number | null>(null);
-  const [isInitializing, setIsInitializing] = useState(false);
-  const [initStatus, setInitStatus] = useState({
-    research_loaded: false,
-    initial_exercises_ready: false,
-    exercise_count: 0,
-  });
-
-  const { setCurrentSession, addToHistory, setMode: setSessionMode } = useSessionStore();
+  const {
+    setCurrentSession,
+    addToHistory,
+    setMode: setSessionMode,
+    setInitializing,
+    setInitStatus,
+    setInitError,
+  } = useSessionStore();
   const { clearMessages } = useChatStore();
   const { loadExercisePool } = useExerciseStore();
 
-  // Poll for session initialization status
-  useEffect(() => {
-    if (!createdSessionId || !isInitializing) return;
+  // Polling for session initialization status with timeout protection
+  const pollSessionStatus = async (sessionId: number) => {
+    let pollCount = 0;
 
     const pollInterval = setInterval(async () => {
+      pollCount++;
+
+      // Timeout protection - stop after max polls
+      if (pollCount > MAX_POLLS) {
+        setInitializing(false);
+        clearInterval(pollInterval);
+        setInitError('El tiempo de inicialización se agotó. Por favor intenta nuevamente.');
+        return;
+      }
+
       try {
-        const status = await sessionApi.getStatus(createdSessionId);
+        const status = await sessionApi.getStatus(sessionId);
         setInitStatus({
           research_loaded: status.research_loaded,
           initial_exercises_ready: status.initial_exercises_ready,
@@ -50,36 +60,22 @@ export const NewSessionDialog: React.FC<NewSessionDialogProps> = ({ isOpen, onCl
 
         // Check if initialization is complete
         if (status.research_loaded && status.initial_exercises_ready) {
-          setIsInitializing(false);
+          setInitializing(false);
           clearInterval(pollInterval);
 
           // Load exercise pool
-          await loadExercisePool(createdSessionId);
-
-          // Close dialog after short delay
-          setTimeout(() => {
-            onClose();
-            // Reset state
-            setCreatedSessionId(null);
-            setInitStatus({
-              research_loaded: false,
-              initial_exercises_ready: false,
-              exercise_count: 0,
-            });
-          }, 500);
+          await loadExercisePool(sessionId);
         }
       } catch (err) {
         console.error('Error polling session status:', err);
       }
     }, 2000); // Poll every 2 seconds
-
-    return () => clearInterval(pollInterval);
-  }, [createdSessionId, isInitializing, loadExercisePool, onClose]);
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setLoading(true);
     setError('');
+    setSubmitting(true);
 
     try {
       const response = await sessionApi.create({
@@ -99,18 +95,36 @@ export const NewSessionDialog: React.FC<NewSessionDialogProps> = ({ isOpen, onCl
         research_context: undefined, // Will be loaded in background
       };
 
+      // Set session and start initialization
       setCurrentSession(session);
       addToHistory(session);
       setSessionMode(mode);
       clearMessages();
 
-      // Start polling for initialization
-      setCreatedSessionId(response.session_id);
-      setIsInitializing(true);
-      setLoading(false);
+      // Start polling for initialization in the background
+      setInitializing(true);
+      setInitStatus({
+        research_loaded: false,
+        initial_exercises_ready: false,
+        exercise_count: 0,
+      });
+      setInitError(null);
+
+      // Close dialog immediately
+      onClose();
+      setSubmitting(false);
+
+      // Start polling for initialization status
+      pollSessionStatus(response.session_id);
+
+      // Reset form for next time
+      setGrade(5);
+      setSubject('Matemáticas');
+      setMode('learn');
+      setTopic('');
     } catch (err: any) {
       setError(err.response?.data?.message || 'Error al crear la sesión');
-      setLoading(false);
+      setSubmitting(false);
     }
   };
 
@@ -120,7 +134,7 @@ export const NewSessionDialog: React.FC<NewSessionDialogProps> = ({ isOpen, onCl
 
       <div className="fixed inset-0 flex items-center justify-center p-4">
         <Dialog.Panel className="mx-auto max-w-md w-full bg-white rounded-xl shadow-lg p-6">
-          <Dialog.Title className="text-xl font-bold text-gray-900 mb-4">
+          <Dialog.Title className="text-xl font-bold text-gray-900 mb-6">
             Nueva Sesión
           </Dialog.Title>
 
@@ -199,42 +213,13 @@ export const NewSessionDialog: React.FC<NewSessionDialogProps> = ({ isOpen, onCl
               </div>
             )}
 
-            {/* Initialization Progress */}
-            {isInitializing && (
-              <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg space-y-3">
-                <div className="flex items-center gap-2 text-sm font-medium text-blue-900">
-                  <svg className="animate-spin h-4 w-4" fill="none" viewBox="0 0 24 24">
-                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
-                  </svg>
-                  Inicializando sesión...
-                </div>
-
-                <div className="space-y-2 text-sm">
-                  <div className="flex items-center justify-between">
-                    <span className="text-gray-700">🔍 Investigación curricular</span>
-                    <span className={`text-xs font-medium ${initStatus.research_loaded ? 'text-green-600' : 'text-gray-500'}`}>
-                      {initStatus.research_loaded ? '✓ Completado' : 'En progreso...'}
-                    </span>
-                  </div>
-
-                  <div className="flex items-center justify-between">
-                    <span className="text-gray-700">📝 Generando ejercicios</span>
-                    <span className={`text-xs font-medium ${initStatus.initial_exercises_ready ? 'text-green-600' : 'text-gray-500'}`}>
-                      {initStatus.initial_exercises_ready ? `✓ ${initStatus.exercise_count} listos` : `${initStatus.exercise_count}/5...`}
-                    </span>
-                  </div>
-                </div>
-              </div>
-            )}
-
             <div className="flex gap-2 pt-2">
               <Button
                 type="button"
                 variant="ghost"
                 onClick={onClose}
                 className="flex-1"
-                disabled={loading || isInitializing}
+                disabled={submitting}
               >
                 Cancelar
               </Button>
@@ -242,9 +227,9 @@ export const NewSessionDialog: React.FC<NewSessionDialogProps> = ({ isOpen, onCl
                 type="submit"
                 variant="primary"
                 className="flex-1"
-                disabled={loading || isInitializing}
+                disabled={submitting}
               >
-                {loading ? 'Creando...' : isInitializing ? 'Inicializando...' : 'Crear Sesión'}
+                {submitting ? 'Creando...' : 'Crear Sesión'}
               </Button>
             </div>
           </form>

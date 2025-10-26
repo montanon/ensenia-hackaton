@@ -11,7 +11,7 @@ import './bubble-animations.css';
 export const BubbleAssistant: React.FC = () => {
   const { isChatOpen, isListening, toggleChat, setListening } = useBubbleStore();
   const { isSpeaking } = useAudioStore();
-  const { currentSession, setInputMode, setOutputMode } = useSessionStore();
+  const { currentSession, isInitializing, setInputMode, setOutputMode } = useSessionStore();
   const [transcript, setTranscript] = useState('');
   const holdTimerRef = useRef<NodeJS.Timeout | null>(null);
   const isHoldingRef = useRef(false);
@@ -110,8 +110,8 @@ export const BubbleAssistant: React.FC = () => {
 
   const bubbleState = getBubbleState();
 
-  // Don't show bubble if no session
-  if (!currentSession) {
+  // Don't show bubble if no session or still initializing
+  if (!currentSession || isInitializing) {
     return null;
   }
 

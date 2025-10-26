@@ -14,7 +14,7 @@ import './bubble-chat-window.css';
 
 export const BubbleChatWindow: React.FC = () => {
   const { isChatOpen, closeChat } = useBubbleStore();
-  const { currentSession, outputMode } = useSessionStore();
+  const { currentSession, isInitializing, outputMode } = useSessionStore();
   const {
     appendStreamChunk,
     completeStream,
@@ -144,8 +144,8 @@ export const BubbleChatWindow: React.FC = () => {
     };
   }, [isResizing]);
 
-  // Don't render chat window if no session
-  if (!currentSession) {
+  // Don't render chat window if no session or still initializing
+  if (!currentSession || isInitializing) {
     return null;
   }
 
