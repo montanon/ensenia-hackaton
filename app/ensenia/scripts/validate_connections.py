@@ -17,6 +17,7 @@ from sqlalchemy.orm import sessionmaker
 
 from app.ensenia.core.config import settings
 from app.ensenia.services.cloudflare.d1 import D1Service
+from app.ensenia.services.cloudflare.kv import KVService
 from app.ensenia.services.cloudflare.r2 import R2Service
 from app.ensenia.services.cloudflare.vectorize import VectorizeService
 
@@ -31,11 +32,13 @@ class ConnectionValidator:
         self.r2 = R2Service()
         self.d1 = D1Service()
         self.vectorize = VectorizeService()
+        self.kv = KVService()
         self.validation_results = {
             "postgresql": {"connected": False, "error": None, "details": {}},
             "r2": {"connected": False, "error": None, "details": {}},
             "d1": {"connected": False, "error": None, "details": {}},
             "vectorize": {"connected": False, "error": None, "details": {}},
+            "kv": {"connected": False, "error": None, "details": {}},
         }
 
     async def validate_postgresql(self) -> bool:
@@ -188,12 +191,12 @@ class ConnectionValidator:
                 WHERE type='table' AND name='curriculum_content'
             """)
 
-            if table_check.get("results"):
+            if table_check:
                 # Count records
                 count_result = await self.d1.query(
                     "SELECT COUNT(*) as count FROM curriculum_content"
                 )
-                count = count_result.get("results", [{}])[0].get("count", 0)
+                count = count_result[0].get("count", 0) if count_result else 0
                 msg = f"  Table curriculum_content: EXISTS ({count} records)"
                 logger.info(msg)
                 self.validation_results["d1"]["details"]["record_count"] = count
@@ -275,6 +278,56 @@ class ConnectionValidator:
             self.validation_results["vectorize"]["error"] = str(e)
             return False
 
+    async def validate_kv(self) -> bool:
+        """Validate KV connection and namespace status.
+
+        Returns:
+            True if connection successful, False otherwise
+        """
+        msg = "\n" + "=" * 60
+        logger.info(msg)
+        msg = "VALIDATING CLOUDFLARE KV CONNECTION"
+        logger.info(msg)
+        msg = "=" * 60
+        logger.info(msg)
+
+        try:
+            # Get namespace info
+            namespace_info = await self.kv.get_namespace_info()
+
+            msg = f"✓ Connected to KV namespace: {settings.cloudflare_kv_namespace_id}"
+            logger.info(msg)
+            msg = f"  Title: {namespace_info.get('title', 'N/A')}"
+            logger.info(msg)
+
+            # List keys to check if namespace has data
+            try:
+                keys = await self.kv.list_keys(prefix="", limit=10)
+                key_count = len(keys)
+                msg = f"  Keys in namespace: {key_count if key_count > 0 else 'Empty or unable to determine'}"
+                logger.info(msg)
+                self.validation_results["kv"]["details"]["key_count"] = key_count
+            except Exception as list_error:
+                msg = f"  Could not list keys: {list_error}"
+                logger.warning(msg)
+                self.validation_results["kv"]["details"]["key_count"] = 0
+
+            self.validation_results["kv"]["connected"] = True
+            self.validation_results["kv"]["details"]["namespace_id"] = (
+                settings.cloudflare_kv_namespace_id
+            )
+            self.validation_results["kv"]["details"]["title"] = namespace_info.get(
+                "title"
+            )
+
+            return True
+
+        except Exception as e:
+            msg = f"✗ KV connection failed: {e}"
+            logger.exception(msg)
+            self.validation_results["kv"]["error"] = str(e)
+            return False
+
     async def run_all_validations(self) -> bool:
         """Run all connection validations.
 
@@ -294,6 +347,7 @@ class ConnectionValidator:
             "r2": await self.validate_r2(),
             "d1": await self.validate_d1(),
             "vectorize": await self.validate_vectorize(),
+            "kv": await self.validate_kv(),
         }
 
         # Summary

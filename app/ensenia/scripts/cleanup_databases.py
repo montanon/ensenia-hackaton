@@ -33,6 +33,7 @@ from sqlalchemy.orm import sessionmaker
 
 from app.ensenia.core.config import settings
 from app.ensenia.services.cloudflare.d1 import D1Service
+from app.ensenia.services.cloudflare.kv import KVService
 from app.ensenia.services.cloudflare.r2 import R2Service
 from app.ensenia.services.cloudflare.vectorize import VectorizeService
 
@@ -56,11 +57,13 @@ class DatabaseCleaner:
         self.r2 = R2Service()
         self.d1 = D1Service()
         self.vectorize = VectorizeService()
+        self.kv = KVService()
         self.stats = {
             "postgresql": {"deleted": 0, "error": None},
             "d1": {"deleted": 0, "error": None},
             "vectorize": {"deleted": 0, "error": None},
             "r2": {"deleted": 0, "error": None},
+            "kv": {"deleted": 0, "error": None},
         }
 
     async def clean_postgresql(self) -> bool:
@@ -148,7 +151,7 @@ class DatabaseCleaner:
                 WHERE type='table' AND name='curriculum_content'
             """)
 
-            if not table_check.get("results"):
+            if not table_check:
                 logger.warning("Table curriculum_content does not exist, skipping")
                 return True
 
@@ -156,7 +159,7 @@ class DatabaseCleaner:
             count_result = await self.d1.query(
                 "SELECT COUNT(*) as count FROM curriculum_content"
             )
-            count = count_result.get("results", [{}])[0].get("count", 0)
+            count = count_result[0].get("count", 0) if count_result else 0
 
             msg = f"Found {count} records in curriculum_content table"
             logger.info(msg)
@@ -198,7 +201,7 @@ class DatabaseCleaner:
         try:
             # Get current vector count by querying with zero vector
             test_vector = [0.0] * settings.workers_ai_embedding_dimensions
-            results = await self.vectorize.query(test_vector, top_k=10000)
+            results = await self.vectorize.query(test_vector, top_k=100)
 
             vector_count = len(results)
             msg = f"Found approximately {vector_count} vectors in index"
@@ -249,9 +252,8 @@ class DatabaseCleaner:
 
         try:
             # List all objects
-            objects = await self.r2.list_objects(prefix="", max_keys=1000)
+            contents = await self.r2.list_objects(prefix="", max_keys=1000)
 
-            contents = objects.get("Contents", [])
             object_count = len(contents)
 
             msg = f"Found {object_count} objects in bucket"
@@ -299,6 +301,74 @@ class DatabaseCleaner:
             logger.exception(msg)
             return False
 
+    async def clean_kv(self) -> bool:
+        """Clean KV namespace by deleting all keys.
+
+        Returns:
+            True if successful, False otherwise
+        """
+        msg = "\n" + "=" * 60
+        logger.info(msg)
+        msg = f"{'[DRY RUN] ' if self.dry_run else ''}CLEANING KV NAMESPACE"
+        logger.info(msg)
+        logger.info("=" * 60)
+
+        try:
+            # List all keys
+            keys = await self.kv.list_keys(prefix="", limit=1000)
+
+            key_count = len(keys)
+
+            msg = f"Found {key_count} keys in namespace"
+            logger.info(msg)
+
+            if key_count == 0:
+                logger.info("Namespace is already empty")
+                return True
+
+            if not self.dry_run:
+                # Delete each key
+                deleted_count = 0
+                for key_info in keys:
+                    key_name = key_info["name"]
+                    # Remove the namespace prefix to get the actual key
+                    if ":" in key_name:
+                        actual_key = key_name.split(":", 1)[1]
+                    else:
+                        actual_key = key_name
+                    await self.kv.delete(actual_key)
+                    deleted_count += 1
+                    if deleted_count % 10 == 0:
+                        msg = f"  Deleted {deleted_count}/{key_count} keys..."
+                        logger.info(msg)
+
+                msg = f"✓ Deleted {deleted_count} keys from KV namespace"
+                logger.info(msg)
+                self.stats["kv"]["deleted"] = deleted_count
+
+                # Note: If there are more than 1000 keys, run cleanup again
+                if key_count >= 1000:
+                    msg = (
+                        "Namespace may contain more keys. Run cleanup again if needed."
+                    )
+                    logger.warning(msg)
+            else:
+                msg = f"[DRY RUN] Would delete {key_count} keys"
+                logger.info(msg)
+                for key_info in keys[:NUM_OBJECTS_TO_SHOW]:  # Show first 5
+                    msg = f"  - {key_info['name']}"
+                    logger.info(msg)
+                if key_count > NUM_OBJECTS_TO_SHOW:
+                    msg = f"  ... and {key_count - NUM_OBJECTS_TO_SHOW} more"
+                    logger.info(msg)
+
+            return True
+
+        except Exception:
+            msg = "✗ KV cleanup failed: {e}"
+            logger.exception(msg)
+            return False
+
     async def clean_all(
         self,
         *,
@@ -306,6 +376,7 @@ class DatabaseCleaner:
         clean_d1: bool = False,
         clean_vectorize: bool = False,
         clean_r2: bool = False,
+        clean_kv: bool = False,
     ) -> dict:
         """Clean selected databases.
 
@@ -341,6 +412,9 @@ class DatabaseCleaner:
 
         if clean_r2:
             results["r2"] = await self.clean_r2()
+
+        if clean_kv:
+            results["kv"] = await self.clean_kv()
 
         # Summary
         msg = "\n" + "=" * 60
@@ -390,7 +464,7 @@ Examples:
     parser.add_argument(
         "--all",
         action="store_true",
-        help="Clean all databases (PostgreSQL, D1, Vectorize, R2)",
+        help="Clean all databases (PostgreSQL, D1, Vectorize, R2, KV)",
     )
     parser.add_argument(
         "--postgresql", action="store_true", help="Clean PostgreSQL only"
@@ -398,6 +472,7 @@ Examples:
     parser.add_argument("--d1", action="store_true", help="Clean D1 only")
     parser.add_argument("--vectorize", action="store_true", help="Clean Vectorize only")
     parser.add_argument("--r2", action="store_true", help="Clean R2 only")
+    parser.add_argument("--kv", action="store_true", help="Clean KV only")
     parser.add_argument("--force", action="store_true", help="Skip confirmation prompt")
 
     args = parser.parse_args()
@@ -407,8 +482,9 @@ Examples:
     clean_d1_db = args.all or args.d1
     clean_vz = args.all or args.vectorize
     clean_r2_bucket = args.all or args.r2
+    clean_kv_namespace = args.all or args.kv
 
-    if not (clean_pg or clean_d1_db or clean_vz or clean_r2_bucket):
+    if not (clean_pg or clean_d1_db or clean_vz or clean_r2_bucket or clean_kv_namespace):
         parser.error("Specify at least one database to clean or use --all")
 
     # Confirmation prompt (unless force or dry-run)
@@ -423,6 +499,8 @@ Examples:
             logger.warning("  - Vectorize index vectors")
         if clean_r2_bucket:
             logger.warning("  - R2 bucket objects")
+        if clean_kv_namespace:
+            logger.warning("  - KV namespace keys")
 
         response = input("\nAre you sure you want to proceed? Type 'yes' to confirm: ")
         if response.lower() != "yes":
@@ -437,6 +515,7 @@ Examples:
             clean_d1=clean_d1_db,
             clean_vectorize=clean_vz,
             clean_r2=clean_r2_bucket,
+            clean_kv=clean_kv_namespace,
         )
 
         # Exit with error if any cleanup failed

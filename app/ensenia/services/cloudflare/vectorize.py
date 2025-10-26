@@ -42,7 +42,7 @@ class VectorizeService:
             httpx.HTTPError: If insertion fails
 
         """
-        url = f"{self.base_url}/vectorize/indexes/{self.index_name}/insert"
+        url = f"{self.base_url}/vectorize/v2/indexes/{self.index_name}/insert"
 
         async with httpx.AsyncClient(timeout=30.0) as client:
             response = await client.post(
@@ -69,7 +69,7 @@ class VectorizeService:
             Upsert operation result
 
         """
-        url = f"{self.base_url}/vectorize/indexes/{self.index_name}/upsert"
+        url = f"{self.base_url}/vectorize/v2/indexes/{self.index_name}/upsert"
 
         async with httpx.AsyncClient(timeout=30.0) as client:
             response = await client.post(
@@ -111,13 +111,12 @@ class VectorizeService:
             httpx.HTTPError: If query fails
 
         """
-        url = f"{self.base_url}/vectorize/indexes/{self.index_name}/query"
+        url = f"{self.base_url}/vectorize/v2/indexes/{self.index_name}/query"
 
+        # v2 API doesn't support returnValues and returnMetadata parameters
         payload: dict[str, Any] = {
             "vector": vector,
             "topK": top_k,
-            "returnValues": return_values,
-            "returnMetadata": return_metadata,
         }
 
         if filter_metadata:
@@ -150,7 +149,7 @@ class VectorizeService:
             httpx.HTTPError: If deletion fails
 
         """
-        url = f"{self.base_url}/vectorize/indexes/{self.index_name}/delete"
+        url = f"{self.base_url}/vectorize/v2/indexes/{self.index_name}/delete"
 
         async with httpx.AsyncClient(timeout=30.0) as client:
             response = await client.post(
@@ -174,7 +173,7 @@ class VectorizeService:
             Index metadata including dimensions, metric, etc.
 
         """
-        url = f"{self.base_url}/vectorize/indexes/{self.index_name}"
+        url = f"{self.base_url}/vectorize/v2/indexes/{self.index_name}"
 
         async with httpx.AsyncClient() as client:
             response = await client.get(url, headers=self._get_headers())
