@@ -16,6 +16,32 @@ export const BubbleAssistant: React.FC = () => {
   const holdTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const isHoldingRef = useRef(false);
 
+  // Initialize WebSocket when component mounts (if session exists)
+  useEffect(() => {
+    console.log('[Bubble] useEffect triggered - currentSession:', currentSession?.id, 'isInitializing:', isInitializing, 'isConnected:', websocketService.isConnected());
+
+    if (currentSession && !isInitializing && !websocketService.isConnected()) {
+      console.log('[Bubble] Connecting WebSocket for session:', currentSession.id);
+      websocketService.connect(currentSession.id, {
+        onConnected: () => {
+          console.log('[Bubble] WebSocket connected successfully');
+        },
+        onError: (msg) => {
+          console.error('[Bubble] WebSocket error:', msg.message);
+        },
+        onDisconnect: () => {
+          console.log('[Bubble] WebSocket disconnected');
+        },
+      });
+    } else if (currentSession && websocketService.isConnected()) {
+      console.log('[Bubble] WebSocket already connected, skipping');
+    }
+
+    return () => {
+      // Keep connection alive, don't disconnect
+    };
+  }, [currentSession, isInitializing]);
+
   // Auto-switch modes based on chat state
   useEffect(() => {
     if (isChatOpen) {
@@ -30,15 +56,22 @@ export const BubbleAssistant: React.FC = () => {
   }, [isChatOpen, setInputMode, setOutputMode]);
 
   const startVoiceInput = () => {
-    if (!currentSession || !speechRecognitionService.isAvailable()) return;
+    console.log('[Bubble] startVoiceInput called');
+    if (!currentSession || !speechRecognitionService.isAvailable()) {
+      console.log('[Bubble] Cannot start voice input - session:', !!currentSession, 'speechAvailable:', speechRecognitionService.isAvailable());
+      return;
+    }
 
+    console.log('[Bubble] Starting voice input');
     setListening(true);
     setTranscript('');
 
     speechRecognitionService.start(
       (text, isFinal) => {
+        console.log('[Bubble] Transcript received:', { text, isFinal });
         setTranscript(text);
         if (isFinal && text.trim()) {
+          console.log('[Bubble] Final transcript, sending via WebSocket:', text);
           // Send message via WebSocket
           websocketService.sendMessage(text);
           setListening(false);
@@ -51,13 +84,16 @@ export const BubbleAssistant: React.FC = () => {
         setTranscript('');
       },
       () => {
+        console.log('[Bubble] Speech recognition ended');
         setListening(false);
       }
     );
   };
 
   const stopVoiceInput = () => {
+    console.log('[Bubble] stopVoiceInput called, transcript:', transcript);
     if (transcript.trim()) {
+      console.log('[Bubble] Stopping voice input and sending message:', transcript);
       websocketService.sendMessage(transcript);
     }
     speechRecognitionService.stop();
@@ -66,8 +102,10 @@ export const BubbleAssistant: React.FC = () => {
   };
 
   const handleMouseDown = () => {
+    console.log('[Bubble] handleMouseDown');
     isHoldingRef.current = true;
     holdTimerRef.current = setTimeout(() => {
+      console.log('[Bubble] Hold timer fired (300ms)');
       if (isHoldingRef.current) {
         startVoiceInput();
       }
@@ -75,6 +113,7 @@ export const BubbleAssistant: React.FC = () => {
   };
 
   const handleMouseUp = () => {
+    console.log('[Bubble] handleMouseUp, isListening:', isListening);
     isHoldingRef.current = false;
 
     if (holdTimerRef.current) {
@@ -83,8 +122,10 @@ export const BubbleAssistant: React.FC = () => {
     }
 
     if (isListening) {
+      console.log('[Bubble] User released, stopping voice input');
       stopVoiceInput();
     } else {
+      console.log('[Bubble] Quick tap detected, toggling chat');
       // Quick tap → toggle chat
       toggleChat();
     }

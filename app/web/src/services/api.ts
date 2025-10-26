@@ -95,8 +95,12 @@ export const exerciseApi = {
   },
 
   getSessionExercises: async (sessionId: number): Promise<Exercise[]> => {
-    const response = await api.get<{ exercises: Exercise[]; total: number }>(`/exercises/sessions/${sessionId}/exercises`);
-    return response.data.exercises;
+    const response = await api.get<{ exercises: Array<{ exercise: Exercise; exercise_session_id: number }>; total: number }>(`/exercises/sessions/${sessionId}/exercises`);
+    // Map the response to include exercise_session_id in the exercise object
+    return response.data.exercises.map(item => ({
+      ...item.exercise,
+      exercise_session_id: item.exercise_session_id,
+    }));
   },
 };
 

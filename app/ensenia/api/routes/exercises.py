@@ -23,10 +23,12 @@ from app.ensenia.schemas.exercises import (
     ExerciseListResponse,
     ExerciseResponse,
     ExerciseType,
+    ExerciseWithSessionInfo,
     GenerateExerciseRequest,
     GenerateExerciseResponse,
     LinkExerciseResponse,
     MultipleChoiceContent,
+    SessionExercisesListResponse,
     ShortAnswerContent,
     SubmitAnswerRequest,
     SubmitAnswerResponse,
@@ -138,33 +140,36 @@ async def generate_exercise(
         )
         logger.info(msg)
 
-        # First, check for existing high-quality exercise to reuse
-        existing_exercises = await repository.search_exercises(
-            db,
-            grade=request.grade,
-            subject=request.subject,
-            topic=request.topic,
-            exercise_type=request.exercise_type,
-            difficulty_level=request.difficulty_level,
-            limit=1,
-        )
-
-        # Reuse existing exercise if it meets quality threshold
-        if existing_exercises and (
-            existing_exercises[0].validation_score >= QUALITY_THRESHOLD
-        ):
-            exercise = existing_exercises[0]
-            logger.info(
-                "Reusing existing exercise %s (score: %s)",
-                exercise.id,
-                exercise.validation_score,
+        # First, check for existing high-quality exercise to reuse (unless force_new is True)
+        if not request.force_new:
+            existing_exercises = await repository.search_exercises(
+                db,
+                grade=request.grade,
+                subject=request.subject,
+                topic=request.topic,
+                exercise_type=request.exercise_type,
+                difficulty_level=request.difficulty_level,
+                limit=1,
             )
 
-            return GenerateExerciseResponse(
-                exercise=db_exercise_to_response(exercise),
-                validation_history=[],
-                iterations_used=0,
-            )
+            # Reuse existing exercise if it meets quality threshold
+            if existing_exercises and (
+                existing_exercises[0].validation_score >= QUALITY_THRESHOLD
+            ):
+                exercise = existing_exercises[0]
+                logger.info(
+                    "Reusing existing exercise %s (score: %s)",
+                    exercise.id,
+                    exercise.validation_score,
+                )
+
+                return GenerateExerciseResponse(
+                    exercise=db_exercise_to_response(exercise),
+                    validation_history=[],
+                    iterations_used=0,
+                )
+        else:
+            logger.info("force_new=True, skipping existing exercise search")
 
         # No suitable exercise found, generate new one
         logger.info("No suitable exercise found in cache, generating new one...")
@@ -386,13 +391,15 @@ async def link_exercise_to_session(
         )
 
     except ValueError as e:
+        msg = f"Failed to link exercise {exercise_id} to session {session_id}: {str(e)}"
+        logger.error(msg)
         raise HTTPException(status_code=400, detail=str(e)) from e
     except Exception as e:
-        msg = "Failed to link exercise to session"
+        msg = f"Failed to link exercise {exercise_id} to session {session_id}: {type(e).__name__}: {str(e)}"
         logger.exception(msg)
         raise HTTPException(
             status_code=500,
-            detail=msg,
+            detail="Failed to link exercise to session",
         ) from e
 
 
@@ -478,7 +485,7 @@ async def get_session_exercises(
     session_id: int,
     db: Annotated[AsyncSession, Depends(get_db)],
     repository: Annotated[ExerciseRepository, Depends(get_exercise_repository)],
-) -> ExerciseListResponse:
+) -> SessionExercisesListResponse:
     """Get all exercises linked to a session.
 
     Args:
@@ -487,7 +494,7 @@ async def get_session_exercises(
         repository: Exercise repository
 
     Returns:
-        List of exercises for the session
+        List of exercises with session link info for the session
 
     Raises:
         HTTPException: If session exercises not found
@@ -496,13 +503,16 @@ async def get_session_exercises(
     try:
         exercise_sessions = await repository.get_session_exercises(db, session_id)
 
-        # Convert to response format
+        # Convert to response format with session info
         exercise_responses = [
-            db_exercise_to_response(ex_session.exercise)
+            ExerciseWithSessionInfo(
+                exercise=db_exercise_to_response(ex_session.exercise),
+                exercise_session_id=ex_session.id,
+            )
             for ex_session in exercise_sessions
         ]
 
-        return ExerciseListResponse(
+        return SessionExercisesListResponse(
             exercises=exercise_responses,
             total=len(exercise_responses),
         )

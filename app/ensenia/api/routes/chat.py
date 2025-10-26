@@ -32,6 +32,7 @@ from app.ensenia.services.generation_service import (
     get_generation_service,
 )
 from app.ensenia.services.research_service import get_research_service
+from app.ensenia.services.websocket_manager import connection_manager
 
 logger = logging.getLogger(__name__)
 
@@ -203,6 +204,9 @@ async def initialize_session_background(
                 session_id,
                 research_topic,
             )
+            await connection_manager.send_content_generation_progress(
+                session_id, "research", "in_progress"
+            )
             try:
                 context = await research_service.update_session_context(
                     session_id, research_topic, db
@@ -210,9 +214,15 @@ async def initialize_session_background(
                 logger.info(
                     "[Background] Research completed for session %s", session_id
                 )
+                await connection_manager.send_content_generation_progress(
+                    session_id, "research", "completed"
+                )
             except Exception:
                 logger.exception(
                     "[Background] Research failed for session %s", session_id
+                )
+                await connection_manager.send_content_generation_progress(
+                    session_id, "research", "failed"
                 )
                 context = None
 
@@ -220,6 +230,9 @@ async def initialize_session_background(
             logger.info(
                 "[Background] Generating exercises and content for session %s",
                 session_id,
+            )
+            await connection_manager.send_content_generation_progress(
+                session_id, "exercises", "in_progress"
             )
 
             exercise_ids = []
@@ -231,6 +244,15 @@ async def initialize_session_background(
                 content_service = ContentGenerationService()
 
                 # Run exercises, learning content, and study guide in parallel
+                logger.info(
+                    "[Background] Starting exercise pool generation for session %s: "
+                    "grade=%s, subject=%s, topic=%s, pool_size=%s",
+                    session_id,
+                    grade,
+                    subject,
+                    research_topic,
+                    INITIAL_EXERCISE_POOL_SIZE,
+                )
                 exercise_task = pool_service.generate_initial_pool(
                     session_id=session_id,
                     grade=grade,
@@ -245,6 +267,9 @@ async def initialize_session_background(
                 if context:
                     msg = f"[Background] Context available, generating learning content and study guide for session {session_id}"
                     logger.info(msg)
+                    await connection_manager.send_content_generation_progress(
+                        session_id, "content", "in_progress"
+                    )
 
                     learning_content_task = content_service.generate_learning_content(
                         subject=subject,
@@ -274,23 +299,66 @@ async def initialize_session_background(
                         )
                         msg = f"[Background] Successfully generated content for session {session_id}: learning_content={'Yes' if learning_content else 'No'}, study_guide={'Yes' if study_guide else 'No'}"
                         logger.info(msg)
+                        await connection_manager.send_content_generation_progress(
+                            session_id, "exercises", "completed"
+                        )
+                        if learning_content or study_guide:
+                            await connection_manager.send_content_generation_progress(
+                                session_id, "content", "completed"
+                            )
                     except Exception as e:
                         msg = f"[Background] Error during parallel content generation for session {session_id}: {str(e)}"
                         logger.exception(msg)
+                        await connection_manager.send_content_generation_progress(
+                            session_id, "content", "failed"
+                        )
                         # Try to get at least exercises if content generation failed
                         try:
+                            logger.info(
+                                "[Background] Content generation failed, attempting to get exercises anyway for session %s",
+                                session_id,
+                            )
                             exercise_ids = await exercise_task
-                        except Exception:
-                            msg = f"[Background] Exercise generation also failed for session {session_id}"
+                            logger.info(
+                                "[Background] Successfully generated %s exercises for session %s despite content failure",
+                                len(exercise_ids),
+                                session_id,
+                            )
+                            await connection_manager.send_content_generation_progress(
+                                session_id, "exercises", "completed"
+                            )
+                        except Exception as ex:
+                            msg = f"[Background] Exercise generation also failed for session {session_id}: {str(ex)}"
                             logger.exception(msg)
+                            await connection_manager.send_content_generation_progress(
+                                session_id, "exercises", "failed"
+                            )
                             exercise_ids = []
                 else:
                     # If no research context, just generate exercises
                     msg = f"[Background] No research context, skipping content generation for session {session_id}"
                     logger.warning(msg)
-                    exercise_ids = await exercise_task
-                    learning_content = None
-                    study_guide = None
+                    try:
+                        exercise_ids = await exercise_task
+                        logger.info(
+                            "[Background] Generated %s exercises without research context for session %s",
+                            len(exercise_ids),
+                            session_id,
+                        )
+                        learning_content = None
+                        study_guide = None
+                        await connection_manager.send_content_generation_progress(
+                            session_id, "exercises", "completed"
+                        )
+                    except Exception as ex:
+                        msg = f"[Background] Exercise generation failed for session {session_id}: {str(ex)}"
+                        logger.exception(msg)
+                        await connection_manager.send_content_generation_progress(
+                            session_id, "exercises", "failed"
+                        )
+                        exercise_ids = []
+                        learning_content = None
+                        study_guide = None
 
                 # Update session with generated content
                 try:
@@ -308,6 +376,16 @@ async def initialize_session_background(
                     msg = f"[Background] Successfully saved content to database for session {session_id}"
                     logger.info(msg)
 
+                    # Notify frontend that content is ready
+                    await connection_manager.send_content_ready(
+                        session_id,
+                        {
+                            "learning_content": learning_content is not None,
+                            "study_guide": study_guide is not None,
+                            "exercises": len(exercise_ids) > 0,
+                        },
+                    )
+
                 except Exception as e:
                     msg = f"[Background] Failed to save content to database for session {session_id}: {str(e)}"
                     logger.exception(msg)
@@ -319,6 +397,9 @@ async def initialize_session_background(
             except Exception as e:
                 msg = f"[Background] Fatal error in content/exercise generation for session {session_id}: {str(e)}"
                 logger.exception(msg)
+                await connection_manager.send_content_generation_progress(
+                    session_id, "initialization", "failed"
+                )
 
             logger.info("[Background] Session %s initialization complete", session_id)
 

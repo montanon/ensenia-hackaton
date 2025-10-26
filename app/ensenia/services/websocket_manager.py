@@ -68,15 +68,18 @@ class ConnectionManager:
 
         websocket = self.active_connections[session_id]
         try:
+            import json
+            json_str = json.dumps(message)
+            logger.info(f"[ConnectionManager] Sending {message.get('type', 'unknown')} to session {session_id}: {json_str[:100]}")
             await websocket.send_json(message)
             msg = (
                 f"Message sent to session {session_id}: "
                 f"{message.get('type', 'unknown')}"
             )
-            logger.debug(msg)
-        except Exception:
-            msg = f"Failed to send message to session {session_id}."
-            logger.exception(msg)
+            logger.info(msg)
+        except Exception as e:
+            msg = f"Failed to send message to session {session_id}: {e}"
+            logger.error(msg, exc_info=True)
             # Clean up broken connection
             self.disconnect(session_id)
             raise
@@ -212,6 +215,78 @@ class ConnectionManager:
 
         """
         return len(self.active_connections)
+
+    async def send_content_ready(
+        self,
+        session_id: int,
+        content_status: dict[str, bool],
+    ) -> None:
+        """Notify client that generated content is ready.
+
+        Args:
+            session_id: The session to send to
+            content_status: Dict with keys 'learning_content', 'study_guide',
+                           'exercises' mapping to boolean readiness status
+
+        """
+        await self.send_message_safe(
+            session_id,
+            {
+                "type": "content_ready",
+                **content_status,
+            },
+        )
+
+    async def send_content_generation_progress(
+        self,
+        session_id: int,
+        stage: str,
+        status: str,
+    ) -> None:
+        """Send progress update during content generation.
+
+        Args:
+            session_id: The session to send to
+            stage: Current generation stage (e.g., "research", "exercises", "content")
+            status: Status message (e.g., "in_progress", "completed", "failed")
+
+        """
+        await self.send_message_safe(
+            session_id,
+            {"type": "content_generation_progress", "stage": stage, "status": status},
+        )
+
+    async def send_message_safe(self, session_id: int, message: dict) -> None:
+        """Send a message safely, handling disconnected sessions gracefully.
+
+        This is useful for background tasks that may complete after the client
+        has disconnected. Unlike send_message, this won't raise an exception
+        if the session is not connected.
+
+        Args:
+            session_id: The session to send the message to
+            message: The message dictionary to send (will be JSON-encoded)
+
+        """
+        if session_id not in self.active_connections:
+            msg_type = message.get("type")
+            msg = f"Session {session_id} not connected, skipping {msg_type}"
+            logger.debug(msg)
+            return
+
+        websocket = self.active_connections[session_id]
+        try:
+            await websocket.send_json(message)
+            msg = (
+                f"Message sent to session {session_id}: "
+                f"{message.get('type', 'unknown')}"
+            )
+            logger.debug(msg)
+        except RuntimeError:
+            msg = f"Failed to send message to session {session_id}."
+            logger.debug(msg)
+            # Don't raise - just log and continue
+            # Connection may have been closed by client
 
 
 # Global connection manager instance

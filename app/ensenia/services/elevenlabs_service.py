@@ -32,6 +32,14 @@ class ElevenLabsService:
 
     def __init__(self):
         """Initialize the ElevenLabs client and cache directory."""
+        if not settings.elevenlabs_api_key:
+            logger.warning(
+                "ElevenLabs API key not configured. TTS features will not work. "
+                "Set ELEVENLABS_API_KEY environment variable."
+            )
+        else:
+            logger.info("ElevenLabs API key configured")
+
         self.client = AsyncElevenLabs(api_key=settings.elevenlabs_api_key)
         self.cache_dir = Path(settings.cache_dir)
         self.cache_dir.mkdir(parents=True, exist_ok=True)
@@ -152,6 +160,11 @@ class ElevenLabsService:
             Exception: If TTS generation fails
 
         """
+        if not settings.elevenlabs_api_key:
+            error_msg = "ElevenLabs API key not configured. Cannot generate audio."
+            logger.error(error_msg)
+            raise ValueError(error_msg)
+
         # Get voice settings for grade level
         voice_settings = self.get_voice_settings(grade_level)
         voice_settings_dict = {
@@ -202,9 +215,9 @@ class ElevenLabsService:
             )
             return audio_bytes
 
-        except Exception:
+        except Exception as e:
             logger.exception("Error generating audio.")
-            raise
+            raise RuntimeError(f"Failed to generate audio: {e!s}") from e
 
     async def generate_speech_streaming(
         self, text: str, grade_level: int = 5

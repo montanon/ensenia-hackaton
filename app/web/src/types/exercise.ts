@@ -48,6 +48,7 @@ export interface Exercise {
   difficulty_level: number;
   is_public: boolean;
   created_at: string;
+  exercise_session_id?: number;  // Optional: included when loaded from session pool
 }
 
 export interface GenerateExerciseRequest {
@@ -59,6 +60,7 @@ export interface GenerateExerciseRequest {
   max_iterations?: number;
   quality_threshold?: number;
   curriculum_context?: string;
+  force_new?: boolean;  // If true, always generate new exercise instead of reusing
 }
 
 export interface SubmitAnswerRequest {

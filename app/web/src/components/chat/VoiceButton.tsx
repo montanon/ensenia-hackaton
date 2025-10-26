@@ -29,6 +29,7 @@ export const VoiceButton: React.FC<VoiceButtonProps> = ({
   const [backendSTTSupported, setBackendSTTSupported] = useState(false);
   const [currentMode, setCurrentMode] = useState<STTMode>(sttMode);
   const [isConnected, setIsConnected] = useState(websocketService.isConnected());
+  const [isProcessing, setIsProcessing] = useState(false);
 
   const audioRecorderRef = useRef<AudioRecordingService | null>(null);
 
@@ -52,11 +53,14 @@ export const VoiceButton: React.FC<VoiceButtonProps> = ({
   const handleSTTResult = useCallback(
     (msg: WSSTTResultMessage) => {
       const resultTranscript = msg.transcript;
+      console.log('[VoiceButton] STT result received:', resultTranscript);
       setTranscript(resultTranscript);
       onSTTResult?.(resultTranscript);
       onTranscript(resultTranscript);
       setIsRecording(false);
+      setIsProcessing(false);
       setTranscript('');
+      setError(null);
     },
     [onTranscript, onSTTResult]
   );
@@ -175,16 +179,21 @@ export const VoiceButton: React.FC<VoiceButtonProps> = ({
     try {
       if (!audioRecorderRef.current) return;
 
+      console.log('[VoiceButton] Stopping backend recording...');
+      setIsProcessing(true);
       await audioRecorderRef.current.stopRecording();
 
       // Add small delay to ensure all chunks are processed before signaling end
       await new Promise(resolve => setTimeout(resolve, 100));
 
       // Signal end of audio stream - triggers Deepgram transcription
+      console.log('[VoiceButton] Sending audio_end signal...');
       websocketService.sendAudioEnd();
     } catch (err) {
       const errorMsg = err instanceof Error ? err.message : 'Failed to stop recording';
+      console.error('[VoiceButton] Error stopping recording:', errorMsg);
       setError(errorMsg);
+      setIsProcessing(false);
     }
   }, []);
 
@@ -264,27 +273,31 @@ export const VoiceButton: React.FC<VoiceButtonProps> = ({
         onMouseLeave={stopRecording}
         onTouchStart={startRecording}
         onTouchEnd={stopRecording}
-        disabled={disabled}
+        disabled={disabled || isProcessing}
         className={cn(
           'w-full px-6 py-4 rounded-lg font-medium',
           'focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500',
           'bg-blue-600 text-white hover:bg-blue-700',
           'transition-colors duration-200',
           isRecording && 'recording-button',
-          disabled && 'opacity-50 cursor-not-allowed'
+          (disabled || isProcessing) && 'opacity-50 cursor-not-allowed'
         )}
       >
         <div className="flex items-center justify-center gap-2">
           <span
             className={cn(
               'text-2xl transition-transform duration-200',
-              isRecording && 'recording-icon'
+              (isRecording || isProcessing) && 'recording-icon'
             )}
           >
-            🎤
+            {isProcessing ? '⏳' : '🎤'}
           </span>
           <span>
-            {isRecording ? 'Grabando...' : 'Mantén presionado para hablar'}
+            {isProcessing
+              ? 'Transcribiendo...'
+              : isRecording
+              ? 'Grabando...'
+              : 'Mantén presionado para hablar'}
           </span>
         </div>
       </button>

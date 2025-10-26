@@ -88,6 +88,130 @@ export const ChatTab: React.FC = () => {
     websocketService.sendMessage(message);
   }, [currentSession, isConnected, addMessage, startStreaming]);
 
+  // Memoize handlers to prevent unnecessary reconnects
+  const handlers = useCallback(() => ({
+    onConnected: () => {
+      console.log('[ChatTab] WebSocket connected successfully');
+      setIsConnected(true);
+
+      // Sync initial output mode with backend
+      const wsMode = outputMode === 'voice' ? 'audio' : 'text';
+      console.log('[ChatTab] Syncing initial mode to backend:', wsMode);
+      websocketService.setMode(wsMode);
+    },
+
+    onTextChunk: (msg: any) => {
+      console.log('[ChatTab] onTextChunk handler called with content:', msg.content.substring(0, 50));
+      appendStreamChunk(msg.content);
+    },
+
+    onMessageComplete: (msg: any) => {
+      console.log('[ChatTab] Message complete signal received:', msg);
+      completeStream(msg.message_id);
+      console.log('[ChatTab] Stream completed, isStreaming should now be false');
+    },
+
+    onSTTPartial: (msg: any) => {
+      console.log('[ChatTab] STT partial received:', msg.transcript);
+      setPartialTranscript(msg.transcript);
+    },
+
+    onSTTResult: (msg: any) => {
+      console.log('[ChatTab] STT result received:', msg.transcript);
+      setPartialTranscript('');
+      // Automatically send the transcribed text as a message
+      handleSendMessage(msg.transcript);
+    },
+
+    onAudioReady: (msg: any) => {
+      console.log('[ChatTab] Audio ready received:', msg);
+      console.log('[ChatTab] Current outputMode:', outputMode);
+
+      const audioUrl = `${API_URL}${msg.url}`;
+      console.log('[ChatTab] Constructed audio URL:', audioUrl);
+
+      setCurrentAudio(audioUrl);
+
+      // Auto-play if output mode is voice
+      if (outputMode === 'voice') {
+        console.log('[ChatTab] Auto-playing audio...');
+
+        // Clean up previous audio if playing
+        if (audioRef.current) {
+          audioRef.current.pause();
+          audioRef.current = null;
+        }
+
+        const audio = new Audio(audioUrl);
+        audioRef.current = audio;
+        setSpeaking(true);
+        setPlaying(true);
+
+        audio.onplay = () => {
+          console.log('[ChatTab] Audio playback started');
+          setSpeaking(true);
+        };
+
+        audio.onended = () => {
+          console.log('[ChatTab] Audio playback ended');
+          setSpeaking(false);
+          setPlaying(false);
+          audioRef.current = null;
+        };
+
+        audio.onerror = (e) => {
+          console.error('[ChatTab] Audio playback error:', e);
+          console.error('[ChatTab] Audio error details:', audio.error);
+          setError('Error al reproducir audio. Por favor, intenta nuevamente.');
+          setSpeaking(false);
+          setPlaying(false);
+          audioRef.current = null;
+        };
+
+        audio.play().catch(err => {
+          console.error('[ChatTab] Audio playback failed:', err);
+          setError('No se pudo reproducir el audio. Por favor, intenta nuevamente.');
+          setSpeaking(false);
+          setPlaying(false);
+          audioRef.current = null;
+        });
+      } else {
+        console.log('[ChatTab] Output mode is text, not auto-playing audio');
+      }
+    },
+
+    onModeChanged: () => {
+      // Mode changed - could update UI if needed
+    },
+
+    onError: (msg: any) => {
+      console.error('[Chat] WebSocket error:', msg.message, 'Code:', msg.code);
+
+      // Provide user-friendly error messages
+      let userMessage = msg.message;
+      if (msg.code === 'TTS_NOT_CONFIGURED') {
+        userMessage = 'Servicio de audio no configurado. Usando modo texto.';
+      } else if (msg.code === 'STT_NOT_CONFIGURED') {
+        userMessage = 'Servicio de transcripción no configurado. Por favor, usa el modo texto.';
+      } else if (msg.code === 'AUDIO_STREAM_ERROR') {
+        userMessage = 'Error al generar audio. La respuesta está disponible en texto.';
+      } else if (msg.code === 'TRANSCRIPTION_ERROR') {
+        userMessage = 'Error al transcribir audio. Por favor, intenta nuevamente.';
+      }
+
+      setError(userMessage);
+
+      // Auto-dismiss non-critical errors after 5 seconds
+      if (msg.code !== 'TTS_NOT_CONFIGURED' && msg.code !== 'STT_NOT_CONFIGURED') {
+        setTimeout(() => setError(null), 5000);
+      }
+    },
+
+    onDisconnect: () => {
+      setIsConnected(false);
+    },
+  }), [outputMode, appendStreamChunk, completeStream, setCurrentAudio, setSpeaking, setPlaying, handleSendMessage]);
+
   useEffect(() => {
     if (!currentSession) return;
 
@@ -95,105 +219,7 @@ export const ChatTab: React.FC = () => {
     console.log('[ChatTab] Initial outputMode:', outputMode);
 
     // Connect WebSocket
-    websocketService.connect(currentSession.id, {
-      onConnected: () => {
-        console.log('[ChatTab] WebSocket connected successfully');
-        setIsConnected(true);
-
-        // Sync initial output mode with backend
-        const wsMode = outputMode === 'voice' ? 'audio' : 'text';
-        console.log('[ChatTab] Syncing initial mode to backend:', wsMode);
-        websocketService.setMode(wsMode);
-      },
-
-      onTextChunk: (msg) => {
-        appendStreamChunk(msg.content);
-      },
-
-      onMessageComplete: (msg) => {
-        completeStream(msg.message_id);
-      },
-
-      onSTTPartial: (msg) => {
-        console.log('[ChatTab] STT partial received:', msg.transcript);
-        setPartialTranscript(msg.transcript);
-      },
-
-      onSTTResult: (msg) => {
-        console.log('[ChatTab] STT result received:', msg.transcript);
-        setPartialTranscript('');
-        // Automatically send the transcribed text as a message
-        handleSendMessage(msg.transcript);
-      },
-
-      onAudioReady: (msg) => {
-        console.log('[ChatTab] Audio ready received:', msg);
-        console.log('[ChatTab] Current outputMode:', outputMode);
-
-        const audioUrl = `${API_URL}${msg.url}`;
-        console.log('[ChatTab] Constructed audio URL:', audioUrl);
-
-        setCurrentAudio(audioUrl);
-
-        // Auto-play if output mode is voice
-        if (outputMode === 'voice') {
-          console.log('[ChatTab] Auto-playing audio...');
-
-          // Clean up previous audio if playing
-          if (audioRef.current) {
-            audioRef.current.pause();
-            audioRef.current = null;
-          }
-
-          const audio = new Audio(audioUrl);
-          audioRef.current = audio;
-          setSpeaking(true);
-          setPlaying(true);
-
-          audio.onplay = () => {
-            console.log('[ChatTab] Audio playback started');
-            setSpeaking(true);
-          };
-
-          audio.onended = () => {
-            console.log('[ChatTab] Audio playback ended');
-            setSpeaking(false);
-            setPlaying(false);
-            audioRef.current = null;
-          };
-
-          audio.onerror = (e) => {
-            console.error('[ChatTab] Audio playback error:', e);
-            console.error('[ChatTab] Audio error details:', audio.error);
-            setSpeaking(false);
-            setPlaying(false);
-            audioRef.current = null;
-          };
-
-          audio.play().catch(err => {
-            console.error('[ChatTab] Audio playback failed:', err);
-            setSpeaking(false);
-            setPlaying(false);
-            audioRef.current = null;
-          });
-        } else {
-          console.log('[ChatTab] Output mode is text, not auto-playing audio');
-        }
-      },
-
-      onModeChanged: () => {
-        // Mode changed - could update UI if needed
-      },
-
-      onError: (msg) => {
-        console.error('[Chat] WebSocket error:', msg.message);
-        setError(`Error: ${msg.message}`);
-      },
-
-      onDisconnect: () => {
-        setIsConnected(false);
-      },
-    });
+    websocketService.connect(currentSession.id, handlers());
 
     return () => {
       websocketService.disconnect();
@@ -206,7 +232,7 @@ export const ChatTab: React.FC = () => {
         audioRef.current = null;
       }
     };
-  }, [currentSession, outputMode, appendStreamChunk, completeStream, setCurrentAudio, setSpeaking, setPlaying, handleSendMessage]);
+  }, [currentSession, handlers]);
 
   // Update WebSocket mode when output mode changes
   useEffect(() => {

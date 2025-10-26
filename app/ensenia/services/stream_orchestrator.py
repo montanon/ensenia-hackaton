@@ -138,18 +138,33 @@ async def process_message_with_dual_stream(
                     assistant_msg.output_mode = OutputMode.AUDIO.value
                     await db.commit()
 
-        except Exception:
-            msg = "Audio streaming failed."
+        except ValueError as ve:
+            # API key not configured
+            msg = f"Audio generation failed - TTS not configured: {ve}"
+            logger.error(msg)
+            await connection_manager.send_error(
+                session_id,
+                "Text-to-speech service not configured. Using text mode only.",
+                "TTS_NOT_CONFIGURED",
+            )
+        except Exception as e:
+            msg = f"Audio streaming failed: {e}"
             logger.exception(msg)
             # Don't fail the whole request if audio fails - graceful degradation
             await connection_manager.send_error(
                 session_id,
-                "Audio generation failed. Text response is available.",
+                f"Audio generation failed: {e!s}. Text response is available.",
                 "AUDIO_STREAM_ERROR",
             )
 
     # Send completion signal
-    await connection_manager.send_message_complete(session_id)
+    try:
+        await connection_manager.send_message_complete(session_id)
+    except Exception as e:
+        # Log but don't fail - connection may have been closed
+        msg = f"Failed to send completion signal for session {session_id}: {e}"
+        logger.warning(msg)
+
     msg = f"Dual stream processing complete for session {session_id}"
     logger.info(msg)
 
@@ -175,16 +190,28 @@ async def stream_text_response(
 
     """
     full_text = ""
+    chunk_count = 0
 
     try:
-        async for chunk in chat_service.send_message_streaming(
-            session, user_message, db
-        ):
+        logger.info(f"[StreamOrchestrator] Starting to stream from OpenAI for session {session.id}")
+        generator = chat_service.send_message_streaming(session, user_message, db)
+        logger.info(f"[StreamOrchestrator] Created async generator for session {session.id}")
+
+        async for chunk in generator:
+            chunk_count += 1
             full_text += chunk
             text_buffer.append(chunk)
 
             # Send chunk to WebSocket
-            await connection_manager.send_text_chunk(session.id, chunk)
+            logger.info(f"[StreamOrchestrator] Chunk {chunk_count}: {len(chunk)} chars - Sending to WebSocket for session {session.id}")
+            try:
+                await connection_manager.send_text_chunk(session.id, chunk)
+                logger.info(f"[StreamOrchestrator] Chunk {chunk_count} sent successfully to WebSocket")
+            except Exception as e:
+                logger.error(f"[StreamOrchestrator] Failed to send text chunk {chunk_count}: {e}", exc_info=True)
+                raise
+
+        logger.info(f"[StreamOrchestrator] Finished streaming {chunk_count} chunks for session {session.id}")
 
         # Save assistant message to database
         assistant_msg = DBMessage(
@@ -249,7 +276,7 @@ async def stream_audio_response(
         logger.info(msg)
 
         # Generate audio (uses caching internally)
-        await tts_service.generate_speech(
+        audio_bytes = await tts_service.generate_speech(
             text=text_content, grade=grade, use_cache=True
         )
 
@@ -262,7 +289,7 @@ async def stream_audio_response(
             session_id=session_id, audio_id=audio_id, url=audio_url
         )
 
-        msg = f"Audio ready for session {session_id}: {audio_url}"
+        msg = f"Audio ready for session {session_id}: {audio_url} ({len(audio_bytes)} bytes)"
         logger.info(msg)
 
         return {
@@ -271,7 +298,11 @@ async def stream_audio_response(
             "duration": None,  # Could calculate from audio_bytes if needed
         }
 
-    except Exception:
-        msg = "Error generating audio."
-        logger.exception(msg)
+    except ValueError as ve:
+        # API key not configured - re-raise with clear message
+        logger.error("TTS API key not configured: %s", ve)
         raise
+    except Exception as e:
+        msg = f"Error generating audio: {e}"
+        logger.exception(msg)
+        raise RuntimeError(msg) from e

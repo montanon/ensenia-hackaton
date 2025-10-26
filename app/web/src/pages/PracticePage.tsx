@@ -14,7 +14,23 @@ export const PracticePage: React.FC = () => {
     isGenerating,
     setCurrentExercise,
     setGenerating,
+    getNextExercise,
+    exercisePool,
   } = useExerciseStore();
+
+  const [isLoadingNext, setIsLoadingNext] = React.useState(false);
+
+  // Automatically load first exercise from pool when session is ready
+  React.useEffect(() => {
+    if (!isInitializing && currentSession && !currentExercise && exercisePool.length > 0) {
+      console.log('[Practice] Auto-loading first exercise from pool');
+      const firstExercise = getNextExercise();
+      if (firstExercise) {
+        console.log('[Practice] Loaded first exercise:', firstExercise.id);
+        setCurrentExercise(firstExercise, firstExercise.exercise_session_id);
+      }
+    }
+  }, [isInitializing, currentSession, currentExercise, exercisePool.length, getNextExercise, setCurrentExercise]);
 
   // Show initializing view while session is being set up
   if (isInitializing) {
@@ -22,24 +38,49 @@ export const PracticePage: React.FC = () => {
   }
 
   const handleGenerateExercise = async () => {
-    if (!currentSession) return;
+    console.log('[Practice] handleGenerateExercise called');
+    if (!currentSession) {
+      console.log('[Practice] No current session');
+      return;
+    }
 
     setGenerating(true);
     try {
+      console.log('[Practice] Generating exercise for:', currentSession.subject, 'Grade:', currentSession.grade);
       const response = await exerciseApi.generate({
         exercise_type: 'multiple_choice',
         grade: currentSession.grade,
         subject: currentSession.subject,
         topic: 'Tema actual',
         difficulty_level: 3,
+        force_new: true,  // Always generate new exercises in practice mode
       });
 
       const exercise = response.exercise;
+      console.log('[Practice] Exercise generated:', exercise.id);
       let assignedSessionId: number | undefined;
 
       if (exercise.id && currentSession.id) {
-        const link = await exerciseApi.assignToSession(exercise.id, currentSession.id);
-        assignedSessionId = link.exercise_session_id;
+        console.log('[Practice] Assigning exercise to session:', exercise.id, currentSession.id);
+        try {
+          const link = await exerciseApi.assignToSession(exercise.id, currentSession.id);
+          assignedSessionId = link.exercise_session_id;
+          console.log('[Practice] Exercise assigned with sessionId:', assignedSessionId);
+        } catch (error: any) {
+          // If exercise is already linked to this session, that's OK
+          if (error.response?.status === 400 && error.response?.data?.detail?.includes('already linked')) {
+            console.log('[Practice] Exercise already linked to session, fetching existing link...');
+            // Get the session exercises to find this one's session ID
+            const sessionExercises = await exerciseApi.getSessionExercises(currentSession.id);
+            const linkedExercise = sessionExercises.find(ex => ex.id === exercise.id);
+            if (linkedExercise?.exercise_session_id) {
+              assignedSessionId = linkedExercise.exercise_session_id;
+              console.log('[Practice] Found existing exercise_session_id:', assignedSessionId);
+            }
+          } else {
+            throw error;
+          }
+        }
       }
 
       setCurrentExercise(exercise, assignedSessionId);
@@ -56,6 +97,31 @@ export const PracticePage: React.FC = () => {
     }
 
     return exerciseApi.submit(exerciseSessionId, { answer });
+  };
+
+  const handleNextExercise = async () => {
+    console.log('[Practice] handleNextExercise called');
+    setIsLoadingNext(true);
+    try {
+      const nextExercise = getNextExercise();
+      console.log('[Practice] Got next exercise from pool:', !!nextExercise);
+      if (nextExercise) {
+        console.log('[Practice] Setting next exercise:', nextExercise.id, 'with session ID:', nextExercise.exercise_session_id);
+        console.log('[Practice] Exercise details:', nextExercise);
+        console.log('[Practice] Exercise content:', nextExercise.content);
+        // Exercises from the pool are already linked to the session during initialization
+        // Use the exercise_session_id from the pool
+        setCurrentExercise(nextExercise, nextExercise.exercise_session_id);
+      } else {
+        console.log('[Practice] No more exercises in pool, generating new one');
+        // No more exercises in pool, generate a new one
+        await handleGenerateExercise();
+      }
+    } catch (error) {
+      console.error('[Practice] Failed to load next exercise:', error);
+    } finally {
+      setIsLoadingNext(false);
+    }
   };
 
   return (
@@ -113,6 +179,8 @@ export const PracticePage: React.FC = () => {
                 <ExerciseCard
                   exercise={currentExercise}
                   onSubmit={handleSubmitExercise}
+                  onNext={handleNextExercise}
+                  isLoadingNext={isLoadingNext}
                 />
               </div>
             )}

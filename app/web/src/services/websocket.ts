@@ -41,23 +41,50 @@ export class WebSocketService {
   private additionalHandlers: MessageHandler = {};
 
   connect(sessionId: number, handlers: MessageHandler): void {
+    console.log('[WS] Connecting to session:', sessionId);
+    console.log('[WS] Handlers being registered:', Object.keys(handlers));
+
+    // Prevent duplicate connections to same session
+    if (this.sessionId === sessionId && this.ws?.readyState === WebSocket.OPEN) {
+      console.log('[WS] Already connected to session:', sessionId, 'Merging handlers instead of reconnecting');
+      // Merge handlers instead of replacing - preserve existing handlers
+      this.handlers = { ...this.handlers, ...handlers };
+      console.log('[WS] Merged handlers. Now registered:', Object.keys(this.handlers));
+      return;
+    }
+
+    // If connecting to a different session, close the old connection
+    if (this.sessionId !== sessionId && this.ws) {
+      console.log('[WS] Closing previous connection to session:', this.sessionId);
+      this.ws.close();
+    }
+
     this.sessionId = sessionId;
-    this.handlers = handlers;
+    // Merge handlers instead of replacing
+    this.handlers = { ...this.handlers, ...handlers };
 
     const wsUrl = getWebSocketUrl(sessionId, WS_URL);
+    console.log('[WS] WebSocket URL:', wsUrl);
     this.ws = new WebSocket(wsUrl);
 
     this.ws.onopen = () => {
+      console.log('[WS] WebSocket opened successfully');
       this.reconnectAttempts = 0;
       this.startPing();
+      this.handlers.onConnected?.({
+        type: 'connected',
+        message: 'Connected to session',
+      });
     };
 
     this.ws.onmessage = (event) => {
       try {
+        console.log('[WS] Raw message received:', event.data.substring(0, 100));
         const message: WSIncomingMessage = JSON.parse(event.data);
+        console.log('[WS] Message received:', message.type);
         this.handleMessage(message);
       } catch (error) {
-        console.error('[WS] Failed to parse message:', error);
+        console.error('[WS] Failed to parse message:', error, 'Data:', event.data);
       }
     };
 
@@ -66,6 +93,7 @@ export class WebSocketService {
     };
 
     this.ws.onclose = () => {
+      console.log('[WS] WebSocket closed');
       this.stopPing();
       this.handlers.onDisconnect?.();
       this.attemptReconnect();
@@ -79,6 +107,7 @@ export class WebSocketService {
         this.additionalHandlers.onConnected?.(message);
         break;
       case 'text_chunk':
+        console.log('[WS] text_chunk handler:', typeof this.handlers.onTextChunk);
         this.handlers.onTextChunk?.(message);
         this.additionalHandlers.onTextChunk?.(message);
         break;
@@ -115,18 +144,23 @@ export class WebSocketService {
   }
 
   send(message: WSOutgoingMessage): void {
-    if (this.ws?.readyState === WebSocket.OPEN) {
+    const isOpen = this.ws?.readyState === WebSocket.OPEN;
+    console.log('[WS] Attempting to send message:', message.type, 'Ready state:', this.ws?.readyState, 'Is open:', isOpen);
+    if (isOpen) {
+      console.log('[WS] Sending message:', message);
       this.ws.send(JSON.stringify(message));
     } else {
-      console.error('[WS] Cannot send message, WebSocket not connected');
+      console.error('[WS] Cannot send message, WebSocket not connected. Ready state:', this.ws?.readyState);
     }
   }
 
   sendMessage(content: string): void {
+    console.log('[WS] sendMessage called with:', content);
     this.send({ type: 'message', content });
   }
 
   setMode(mode: 'text' | 'audio'): void {
+    console.log('[WS] setMode called with:', mode);
     this.send({ type: 'set_mode', mode });
   }
 

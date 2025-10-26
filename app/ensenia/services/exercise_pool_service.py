@@ -15,6 +15,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.ensenia.database.models import Session as DBSession
+from app.ensenia.database.session import AsyncSessionLocal
 from app.ensenia.schemas.exercises import DifficultyLevel, ExerciseType
 from app.ensenia.services.exercise_repository import ExerciseRepository
 from app.ensenia.services.generation_service import GenerationService
@@ -70,10 +71,18 @@ class ExercisePoolService:
             List of generated exercise IDs
 
         """
-        msg = (
-            f"Generating initial pool of {pool_size} exercises for session {session_id}"
+        logger.info(
+            "[ExercisePool] Generating initial pool of %d exercises for session %d",
+            pool_size,
+            session_id,
         )
-        logger.info(msg)
+        logger.info(
+            "[ExercisePool] Parameters: grade=%d, subject=%s, topic=%s, has_context=%s",
+            grade,
+            subject,
+            topic,
+            curriculum_context is not None,
+        )
 
         # Define exercise mix (diverse types)
         exercise_mix = [
@@ -84,9 +93,26 @@ class ExercisePoolService:
             (ExerciseType.SHORT_ANSWER, DifficultyLevel.MEDIUM),
         ][:pool_size]
 
+        logger.info(
+            "[ExercisePool] Exercise mix: %s",
+            ", ".join(f"{t.value}/{d.value}" for t, d in exercise_mix),
+        )
+
         # Generate exercises in parallel
+        import time
+
+        start_time = time.time()
         tasks = []
-        for exercise_type, difficulty in exercise_mix:
+        for i, (exercise_type, difficulty) in enumerate(exercise_mix, 1):
+            logger.info(
+                "[ExercisePool] Task %d/%d: Generating %s (difficulty=%s)...",
+                i,
+                len(exercise_mix),
+                exercise_type.value,
+                difficulty.value,
+            )
+            # Create a separate database session for each concurrent task
+            # This avoids SQLAlchemy's "concurrent operations not permitted" error
             task = self._generate_and_link_exercise(
                 session_id=session_id,
                 grade=grade,
@@ -95,23 +121,63 @@ class ExercisePoolService:
                 exercise_type=exercise_type,
                 difficulty_level=difficulty,
                 curriculum_context=curriculum_context,
-                db=db,
+                db=None,  # Pass None to create a new session per task
             )
             tasks.append(task)
 
         # Execute all generations in parallel
-        exercise_ids = await asyncio.gather(*tasks, return_exceptions=True)
-
-        # Filter out errors and return successful IDs
-        successful_ids = [
-            ex_id for ex_id in exercise_ids if not isinstance(ex_id, Exception)
-        ]
         logger.info(
-            "Generated %d/%d exercises for session %s",
+            "[ExercisePool] Starting parallel generation of %d exercises...", len(tasks)
+        )
+        exercise_ids = await asyncio.gather(*tasks, return_exceptions=True)
+        elapsed = time.time() - start_time
+
+        # Filter out errors and LOG THEM
+        successful_ids = []
+        failed_count = 0
+        for i, result in enumerate(exercise_ids, 1):
+            exercise_type, difficulty = exercise_mix[i - 1]
+            if isinstance(result, Exception):
+                failed_count += 1
+                logger.error(
+                    "[ExercisePool] ✗ Exercise %d/%d FAILED (%s/%s): %s",
+                    i,
+                    len(exercise_ids),
+                    exercise_type.value,
+                    difficulty.value,
+                    str(result),
+                )
+                logger.exception(
+                    "[ExercisePool] Full error traceback for exercise %d:",
+                    i,
+                    exc_info=result,
+                )
+            else:
+                successful_ids.append(result)
+                logger.info(
+                    "[ExercisePool] ✓ Exercise %d/%d SUCCESS (%s/%s) - ID: %d",
+                    i,
+                    len(exercise_ids),
+                    exercise_type.value,
+                    difficulty.value,
+                    result,
+                )
+
+        logger.info(
+            "[ExercisePool] ✓ Generated %d/%d exercises for session %d in %.2fs (failed: %d)",
             len(successful_ids),
             pool_size,
             session_id,
+            elapsed,
+            failed_count,
         )
+
+        if failed_count > 0:
+            logger.warning(
+                "[ExercisePool] ⚠️ Pool generation incomplete - %d/%d exercises failed!",
+                failed_count,
+                pool_size,
+            )
 
         return successful_ids
 
@@ -124,7 +190,7 @@ class ExercisePoolService:
         exercise_type: ExerciseType,
         difficulty_level: DifficultyLevel,
         curriculum_context: str | None,
-        db: AsyncSession,
+        db: AsyncSession | None,
     ) -> int:
         """Generate a single exercise and link it to the session.
 
@@ -136,7 +202,7 @@ class ExercisePoolService:
             exercise_type: Type of exercise
             difficulty_level: Difficulty level
             curriculum_context: Curriculum context
-            db: Database session
+            db: Database session (if None, creates a new session for this task)
 
         Returns:
             Exercise ID
@@ -145,12 +211,44 @@ class ExercisePoolService:
             Exception: If generation or linking fails
 
         """
+        logger.debug(
+            "[ExercisePool] _generate_and_link_exercise started: type=%s, difficulty=%s, session=%d",
+            exercise_type.value,
+            difficulty_level.value,
+            session_id,
+        )
+
+        # If no session provided, create one for this task
+        # This avoids concurrent operation issues when running in parallel
+        if db is None:
+            async with AsyncSessionLocal() as new_db:
+                return await self._generate_and_link_exercise(
+                    session_id=session_id,
+                    grade=grade,
+                    subject=subject,
+                    topic=topic,
+                    exercise_type=exercise_type,
+                    difficulty_level=difficulty_level,
+                    curriculum_context=curriculum_context,
+                    db=new_db,
+                )
+
         try:
+            import time
+
+            start_time = time.time()
+
             # Generate exercise
+            logger.debug(
+                "[ExercisePool] Calling generation_service.generate_exercise (type=%s, difficulty=%s)...",
+                exercise_type.value,
+                difficulty_level.value,
+            )
+
             (
                 content,
                 validation_history,
-                _,
+                iterations,
             ) = await self.generation_service.generate_exercise(
                 exercise_type=exercise_type,
                 grade=grade,
@@ -160,10 +258,20 @@ class ExercisePoolService:
                 curriculum_context=curriculum_context,
             )
 
+            gen_elapsed = time.time() - start_time
+            logger.debug(
+                "[ExercisePool] Exercise generated in %.2fs (%d iterations, %d validation steps)",
+                gen_elapsed,
+                iterations,
+                len(validation_history),
+            )
+
             # Get final validation score
             final_score = validation_history[-1].score if validation_history else 0
+            logger.debug("[ExercisePool] Final validation score: %d", final_score)
 
             # Save to database
+            logger.debug("[ExercisePool] Saving exercise to database...")
             db_exercise = await self.repository.save_exercise(
                 db,
                 exercise_type=exercise_type,
@@ -175,28 +283,41 @@ class ExercisePoolService:
                 difficulty_level=difficulty_level,
                 is_public=True,
             )
+            logger.debug("[ExercisePool] Exercise saved with ID: %d", db_exercise.id)
 
             # Link to session
+            logger.debug(
+                "[ExercisePool] Linking exercise %d to session %d...",
+                db_exercise.id,
+                session_id,
+            )
             await self.repository.link_exercise_to_session(
                 db,
                 exercise_id=db_exercise.id,
                 session_id=session_id,
             )
-            msg = (
-                f"Generated and linked exercise {db_exercise.id} "
-                f"(type={exercise_type.value}, difficulty={difficulty_level.value}) "
-                f"to session {session_id}"
+
+            total_elapsed = time.time() - start_time
+            logger.info(
+                "[ExercisePool] ✓ Generated and linked exercise %d (type=%s, difficulty=%s) to session %d (%.2fs)",
+                db_exercise.id,
+                exercise_type.value,
+                difficulty_level.value,
+                session_id,
+                total_elapsed,
             )
-            logger.info(msg)
 
             return db_exercise.id
 
-        except Exception:
-            msg = (
-                f"Failed to generate exercise (type={exercise_type.value}, "
-                f"difficulty={difficulty_level.value})"
+        except Exception as e:
+            logger.error(
+                "[ExercisePool] ✗ Failed to generate exercise (type=%s, difficulty=%s, session=%d): %s",
+                exercise_type.value,
+                difficulty_level.value,
+                session_id,
+                str(e),
             )
-            logger.exception(msg)
+            logger.exception("[ExercisePool] Full error traceback:")
             raise
 
     async def get_pool_status(
@@ -303,7 +424,7 @@ class ExercisePoolService:
                 exercise_type=exercise_type,
                 difficulty_level=diff,
                 curriculum_context=session.research_context,
-                db=db,
+                db=None,  # Pass None to create a new session per task to avoid concurrent operations
             )
             tasks.append(task)
 

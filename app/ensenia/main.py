@@ -147,9 +147,9 @@ app.include_router(exercises.router)  # Exercise generation and management route
 
 # Mount static files for cached audio
 cache_path = Path(settings.cache_dir)
-if cache_path.exists():
-    app.mount("/audio", StaticFiles(directory=str(cache_path)), name="audio")
-    logger.info("Mounted audio cache at /audio")
+cache_path.mkdir(parents=True, exist_ok=True)
+app.mount("/audio", StaticFiles(directory=str(cache_path)), name="audio")
+logger.info("Mounted audio cache at /audio from %s", cache_path)
 
 
 @app.get("/")

@@ -9,15 +9,22 @@ export const BubbleChatInput: React.FC = () => {
   const { addMessage, startStreaming } = useChatStore();
 
   const handleSend = () => {
-    if (!message.trim() || !currentSession) return;
+    console.log('[ChatInput] handleSend called, message:', message, 'currentSession:', currentSession?.id);
+    if (!message.trim() || !currentSession) {
+      console.warn('[ChatInput] Cannot send - message empty or no session');
+      return;
+    }
 
+    console.log('[ChatInput] Adding message to store:', message);
     addMessage({
       role: 'user',
       content: message.trim(),
       timestamp: new Date().toISOString(),
     });
 
+    console.log('[ChatInput] Starting streaming');
     startStreaming();
+    console.log('[ChatInput] Sending message via WebSocket:', message);
     websocketService.sendMessage(message.trim());
     setMessage('');
   };

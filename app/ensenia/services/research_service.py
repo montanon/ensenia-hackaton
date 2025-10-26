@@ -120,7 +120,20 @@ class ResearchService:
             limit=limit,
         )
 
+        logger.info(
+            "[RAG] Starting semantic search - Query: '%s', Grade: %d, Subject: '%s', Limit: %d",
+            query[:100],  # Truncate long queries
+            grade,
+            subject,
+            limit,
+        )
+        logger.debug("[RAG] Search endpoint: %s", endpoint)
+
         try:
+            import time
+
+            start_time = time.time()
+
             response = await self.client.post(
                 endpoint,
                 json=request_data.model_dump(),
@@ -128,17 +141,43 @@ class ResearchService:
             )
             response.raise_for_status()
 
-            data = response.json()
-            return SearchResponse.model_validate(data)
+            elapsed = time.time() - start_time
+            logger.info("[RAG] Search request completed in %.2fs", elapsed)
 
-        except httpx.HTTPError:
-            logger.exception(
-                "Error searching curriculum: %s",
+            data = response.json()
+            search_response = SearchResponse.model_validate(data)
+
+            logger.info(
+                "[RAG] Search found %d results (search_time: %.2fms)",
+                len(search_response.content_ids),
+                search_response.search_time_ms,
+            )
+
+            if search_response.content_ids:
+                logger.info(
+                    "[RAG] Top results: %s",
+                    ", ".join(search_response.content_ids[:3]),
+                )
+                if search_response.metadata:
+                    logger.info(
+                        "[RAG] Top scores: %s",
+                        ", ".join(f"{m.score:.3f}" for m in search_response.metadata[:3]),
+                    )
+            else:
+                logger.warning("[RAG] No results found for query: '%s'", query)
+
+            return search_response
+
+        except httpx.HTTPError as e:
+            logger.error(
+                "[RAG] HTTP error during search (status: %s): %s",
+                getattr(e.response, "status_code", "unknown"),
                 response.text if "response" in locals() else "No response",
             )
             raise
-        except Exception:
-            logger.exception("Error parsing search response")
+        except Exception as e:
+            logger.error("[RAG] Error during search: %s", str(e))
+            logger.exception("Full search error traceback:")
             raise
 
     async def fetch_content(self, content_ids: list[str]) -> FetchResponse:
@@ -159,7 +198,17 @@ class ResearchService:
 
         payload = {"content_ids": content_ids}
 
+        logger.info(
+            "[RAG] Fetching %d content documents: %s",
+            len(content_ids),
+            ", ".join(content_ids[:5]) + ("..." if len(content_ids) > 5 else ""),
+        )
+
         try:
+            import time
+
+            start_time = time.time()
+
             response = await self.client.post(
                 endpoint,
                 json=payload,
@@ -167,17 +216,46 @@ class ResearchService:
             )
             response.raise_for_status()
 
-            data = response.json()
-            return FetchResponse.model_validate(data)
+            elapsed = time.time() - start_time
+            logger.info("[RAG] Fetch request completed in %.2fs", elapsed)
 
-        except httpx.HTTPError:
-            logger.exception(
-                "Error fetching content: %s",
+            data = response.json()
+            fetch_response = FetchResponse.model_validate(data)
+
+            logger.info(
+                "[RAG] Retrieved %d documents (fetch_time: %.2fms)",
+                len(fetch_response.contents),
+                fetch_response.fetch_time_ms,
+            )
+
+            # Log details about each fetched document
+            for i, content in enumerate(fetch_response.contents, 1):
+                logger.info(
+                    "[RAG] Document %d: '%s' (Grade: %d, Subject: %s, Length: %d chars)",
+                    i,
+                    content.title[:60],
+                    content.grade,
+                    content.subject,
+                    len(content.content_text),
+                )
+                if content.learning_objectives:
+                    logger.debug(
+                        "[RAG]   Learning Objectives: %s",
+                        ", ".join(content.learning_objectives[:3]),
+                    )
+
+            return fetch_response
+
+        except httpx.HTTPError as e:
+            logger.error(
+                "[RAG] HTTP error during fetch (status: %s): %s",
+                getattr(e.response, "status_code", "unknown"),
                 response.text if "response" in locals() else "No response",
             )
             raise
-        except Exception:
-            logger.exception("Error parsing fetch response")
+        except Exception as e:
+            logger.error("[RAG] Error during fetch: %s", str(e))
+            logger.exception("Full fetch error traceback:")
             raise
 
     async def generate_explanation(  # noqa: PLR0913
@@ -306,8 +384,20 @@ class ResearchService:
             Research context as formatted string
 
         """
+        logger.info(
+            "[RAG] Building context for topic: '%s' (Grade: %d, Subject: %s)",
+            topic,
+            grade,
+            subject,
+        )
+
         try:
+            import time
+
+            context_start = time.time()
+
             # Search for relevant content
+            logger.info("[RAG] Step 1/3: Searching curriculum...")
             search_results = await self.search_curriculum(
                 query=topic, grade=grade, subject=subject, limit=5
             )
@@ -316,12 +406,24 @@ class ResearchService:
             content_ids = search_results.content_ids[:3]
 
             if not content_ids:
-                logger.warning("No curriculum content found for topic: %s", topic)
+                logger.warning(
+                    "[RAG] No curriculum content found for topic: '%s' (Grade: %d, Subject: %s)",
+                    topic,
+                    grade,
+                    subject,
+                )
                 return f"Topic: {topic}\nNo specific curriculum content found."
+
+            logger.info(
+                "[RAG] Step 2/3: Fetching top %d documents...",
+                len(content_ids),
+            )
 
             # Fetch detailed content
             fetch_response = await self.fetch_content(content_ids)
             contents = fetch_response.contents
+
+            logger.info("[RAG] Step 3/3: Building formatted context...")
 
             # Format context
             context_parts = [
@@ -332,6 +434,7 @@ class ResearchService:
                 "",
             ]
 
+            total_chars = 0
             for i, content in enumerate(contents, 1):
                 context_parts.append(f"Content {i}: {content.title}")
                 context_parts.append(f"  OA: {content.ministry_standard_ref}")
@@ -348,11 +451,29 @@ class ResearchService:
                 )
                 context_parts.append(f"  Content: {snippet}")
                 context_parts.append("")
+                total_chars += len(content.content_text)
 
-            return "\n".join(context_parts)
+            context = "\n".join(context_parts)
+            elapsed = time.time() - context_start
 
-        except Exception:
-            logger.exception("Error getting research context for topic: %s", topic)
+            logger.info(
+                "[RAG] Context built successfully in %.2fs - %d documents, %d total chars, %d context length",
+                elapsed,
+                len(contents),
+                total_chars,
+                len(context),
+            )
+            logger.debug("[RAG] Context preview: %s...", context[:300])
+
+            return context
+
+        except Exception as e:
+            logger.error(
+                "[RAG] Error getting research context for topic '%s': %s",
+                topic,
+                str(e),
+            )
+            logger.exception("[RAG] Full context building error traceback:")
             return f"Topic: {topic}\nError retrieving curriculum content."
 
     async def update_session_context(
@@ -372,6 +493,12 @@ class ResearchService:
             ValueError: If session not found
 
         """
+        logger.info(
+            "[RAG] Updating session %d with research context for topic: '%s'",
+            session_id,
+            topic,
+        )
+
         # Load session
         stmt = select(DBSession).where(DBSession.id == session_id)
         result = await db.execute(stmt)
@@ -379,16 +506,36 @@ class ResearchService:
 
         if not session:
             msg = f"Session {session_id} not found"
+            logger.error("[RAG] %s", msg)
             raise ValueError(msg)
 
+        logger.info(
+            "[RAG] Session loaded: Grade=%d, Subject='%s'",
+            session.grade,
+            session.subject,
+        )
+
         # Get research context
+        import time
+
+        start_time = time.time()
         context = await self.get_context(topic, session.grade, session.subject)
+        elapsed = time.time() - start_time
 
         # Update session
         session.research_context = context
         await db.commit()
 
-        logger.info("Updated session %s with research context", session_id)
+        logger.info(
+            "[RAG] ✓ Successfully updated session %d with research context (%.2fs total, %d chars)",
+            session_id,
+            elapsed,
+            len(context),
+        )
+        logger.info(
+            "[RAG] Context summary: %s", context.split("\n")[0] if context else "Empty"
+        )
+
         return context
 
 

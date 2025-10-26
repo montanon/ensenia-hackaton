@@ -8,15 +8,27 @@ import { ExerciseResults } from './ExerciseResults';
 interface ExerciseCardProps {
   exercise: Exercise;
   onSubmit: (answer: string) => Promise<SubmitAnswerResponse>;
+  onNext?: () => void;
+  isLoadingNext?: boolean;
 }
 
 export const ExerciseCard: React.FC<ExerciseCardProps> = ({
   exercise,
   onSubmit,
+  onNext,
+  isLoadingNext,
 }) => {
   const [submitting, setSubmitting] = useState(false);
   const [result, setResult] = useState<SubmitAnswerResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
+
+  // Reset state when exercise changes
+  React.useEffect(() => {
+    console.log('[ExerciseCard] Exercise changed, resetting state');
+    setSubmitting(false);
+    setResult(null);
+    setError(null);
+  }, [exercise.id]);
 
   const handleSubmit = async (answer: string) => {
     setSubmitting(true);
@@ -111,6 +123,8 @@ export const ExerciseCard: React.FC<ExerciseCardProps> = ({
           <ExerciseResults
             isCorrect={result.is_correct ?? true}
             explanation={result.feedback || 'Respuesta registrada exitosamente.'}
+            onNext={onNext}
+            isLoadingNext={isLoadingNext}
           />
         </div>
       )}

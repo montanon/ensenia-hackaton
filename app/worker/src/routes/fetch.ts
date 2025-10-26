@@ -29,8 +29,10 @@ export async function handleFetch(
   try {
     // Parse and validate request
     const body = await parseJsonBody<FetchRequest>(request);
+    console.log('[Worker] RAG Fetch requested for content IDs:', body.content_ids?.slice(0, 5).join(', ') + (body.content_ids?.length > 5 ? '...' : ''));
 
     if (!body.content_ids || body.content_ids.length === 0) {
+      console.warn('[Worker] Fetch request with no content IDs');
       return errorResponse(
         400,
         'INVALID_REQUEST',
@@ -40,6 +42,7 @@ export async function handleFetch(
 
     // Limit to 50 IDs max per request
     const contentIds = body.content_ids.slice(0, 50);
+    console.log('[Worker] Fetching', contentIds.length, 'content documents from database');
 
     // Build SQL query with placeholders
     const placeholders = contentIds.map(() => '?').join(',');
@@ -65,11 +68,16 @@ export async function handleFetch(
 
     // Execute query with parameters (once for WHERE IN, once for ORDER BY)
     const params = [...contentIds, ...contentIds];
+    const dbStartTime = Date.now();
     const results = await env.DB.prepare(query).bind(...params).all();
+    console.log('[Worker] Database query completed in', Date.now() - dbStartTime, 'ms');
 
     if (!results.success) {
+      console.error('[Worker] Database query failed');
       return errorResponse(500, 'DB_QUERY_FAILED', 'Database query failed');
     }
+
+    console.log('[Worker] Retrieved', results.results.length, 'documents from database');
 
     // Transform database records to API format
     const contents: CurriculumContent[] = results.results.map((row: any) => {
@@ -88,15 +96,21 @@ export async function handleFetch(
       };
     });
 
+    console.log('[Worker] RAG context documents:');
+    contents.forEach((c, i) => {
+      console.log(`  ${i + 1}. "${c.title}" (Grade: ${c.grade}, Subject: ${c.subject}, Length: ${c.content_text.length} chars)`);
+    });
+
     // Prepare response
     const response: FetchResponse = {
       contents,
       fetch_time_ms: Date.now() - startTime,
     };
 
+    console.log('[Worker] Fetch completed in', Date.now() - startTime, 'ms');
     return jsonResponse(response);
   } catch (error: any) {
-    console.error('Fetch error:', error);
+    console.error('[Worker] Fetch error:', error);
     return errorResponse(
       500,
       'FETCH_FAILED',

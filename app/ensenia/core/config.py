@@ -41,8 +41,8 @@ class Settings(BaseSettings):
 
     # Database
     database_url: str = "postgresql+asyncpg://ensenia:hackathon@localhost:5433/ensenia"
-    database_pool_size: int = 5
-    database_max_overflow: int = 10
+    database_pool_size: int = 20
+    database_max_overflow: int = 30
 
     # Chat Configuration
     chat_context_window: int = 10  # Number of messages to keep in context
@@ -73,7 +73,7 @@ class Settings(BaseSettings):
 
     # OpenAI
     openai_api_key: str = ""
-    openai_model: str = "gpt-4-turbo-preview"
+    openai_model: str = "gpt-3.5-turbo"
     openai_max_tokens: int = 2000
     openai_temperature: float = 0.4
 
@@ -91,7 +91,10 @@ class Settings(BaseSettings):
         1  # Reduced for performance (30s → 10s per exercise)
     )
     generation_quality_threshold: int = 6
-    generation_model: str = "gpt-4-turbo-preview"
+    generation_model: str = "gpt-3.5-turbo"
+    generation_fast_model: str = "gpt-3.5-turbo"
+    generation_use_fast_mode: bool = True
+    generation_skip_validation_for_easy: bool = False
 
     # Cache Directory
     cache_dir: str = "./cache"

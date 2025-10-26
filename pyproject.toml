@@ -135,6 +135,17 @@ ignore = [
     "E501",      # Line too long
     "ARG002",    # Unused arguments
 ]
+"app/ensenia/api/routes/chat.py" = [
+    "E501",      # Line too long (logging messages)
+    "PLR0915",   # Too many statements (background task)
+    "RUF010",    # Redundant str() conversion in error messages
+]
+"app/ensenia/api/routes/websocket.py" = [
+    "E501",      # Line too long (logging messages)
+    "RUF010",    # Redundant str() conversion (acceptable)
+    "F841",      # Unused variable (acceptable in mode toggle)
+    "PLR1714",   # Multiple comparisons (acceptable for readability)
+]
 
 [build-system]
 requires = ["hatchling", "hatch-vcs"]
@@ -167,4 +178,5 @@ timeout = 10
 
 
 markers = [
+    "priority_1: marks tests as high priority (deselect with '-m \"not priority_1\"')",
 ]

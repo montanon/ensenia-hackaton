@@ -83,7 +83,11 @@ export class AudioRecordingService {
       }
 
       // Create MediaRecorder
-      const mimeType = AudioRecordingService.getSupportedMimeTypes()[0] || 'audio/webm';
+      const supportedTypes = AudioRecordingService.getSupportedMimeTypes();
+      const mimeType = supportedTypes[0] || 'audio/webm';
+      
+      console.log('[AudioRecording] Supported MIME types:', supportedTypes);
+      console.log('[AudioRecording] Using MIME type:', mimeType);
 
       this.mediaRecorder = new MediaRecorder(this.stream, {
         mimeType,
@@ -92,11 +96,22 @@ export class AudioRecordingService {
 
       this.chunks = [];
       this.isRecording = true;
+      
+      console.log('[AudioRecording] MediaRecorder created with:', {
+        mimeType: this.mediaRecorder.mimeType,
+        audioBitsPerSecond: 128000,
+        state: this.mediaRecorder.state,
+      });
 
       // Handle data available events - send chunks via callback
       this.mediaRecorder.ondataavailable = (event: BlobEvent) => {
         if (event.data.size > 0) {
           this.chunks.push(event.data);
+          console.log('[AudioRecording] Chunk received:', {
+            size: event.data.size,
+            type: event.data.type,
+            totalChunks: this.chunks.length,
+          });
 
           // Convert blob to base64 and send
           this.blobToBase64(event.data)

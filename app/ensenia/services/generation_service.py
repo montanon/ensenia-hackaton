@@ -207,11 +207,26 @@ def generate_node(state: GenerationState) -> dict[str, Any]:
     On first iteration: Creates initial exercise.
     On subsequent iterations: Refines based on validation feedback.
     """
+    # Use fast model for simple exercises
+    use_fast_model = (
+        settings.generation_use_fast_mode
+        and state.exercise_type
+        in [ExerciseType.MULTIPLE_CHOICE, ExerciseType.TRUE_FALSE]
+        and state.difficulty_level in [DifficultyLevel.EASY, DifficultyLevel.MEDIUM]
+    )
+
+    model_name = (
+        settings.generation_fast_model if use_fast_model else settings.generation_model
+    )
+
     llm = ChatOpenAI(
-        model=settings.generation_model,
+        model=model_name,
         api_key=settings.openai_api_key,
         temperature=0.7,
+        model_kwargs={"response_format": {"type": "json_object"}},  # Force JSON output
     )
+
+    logger.info(f"Using model: {model_name} (fast_mode={use_fast_model})")
 
     # Build curriculum context
     curriculum_context = state.curriculum_context or (
@@ -238,7 +253,9 @@ def generate_node(state: GenerationState) -> dict[str, Any]:
 
     # Build user message
     if state.iteration_count == 0:
-        user_message = f"Genera un ejercicio de tipo {state.exercise_type.value} sobre el tema: {state.topic}"
+        user_message = f"""Genera un ejercicio de tipo {state.exercise_type.value} sobre el tema: {state.topic}
+
+IMPORTANTE: Responde SOLO con un objeto JSON válido siguiendo el formato especificado. No incluyas texto adicional."""
     else:
         user_message = f"""Mejora el siguiente ejercicio basándote en esta retroalimentación:  # noqa: E501
 
@@ -248,7 +265,9 @@ RETROALIMENTACIÓN:
 EJERCICIO ACTUAL:
 {json.dumps(state.exercise_draft, indent=2, ensure_ascii=False)}
 
-Genera una versión mejorada que aborde todos los puntos de la retroalimentación."""
+Genera una versión mejorada que aborde todos los puntos de la retroalimentación.
+
+IMPORTANTE: Responde SOLO con un objeto JSON válido. No incluyas texto adicional."""
 
     # Call LLM
     messages = [
@@ -291,11 +310,25 @@ Genera una versión mejorada que aborde todos los puntos de la retroalimentació
 
 def validate_node(state: GenerationState) -> dict[str, Any]:
     """Validate exercise quality and provide feedback."""
+    # Use fast model for validation too when in fast mode
+    use_fast_model = (
+        settings.generation_use_fast_mode
+        and state.exercise_type
+        in [ExerciseType.MULTIPLE_CHOICE, ExerciseType.TRUE_FALSE]
+        and state.difficulty_level in [DifficultyLevel.EASY, DifficultyLevel.MEDIUM]
+    )
+
+    model_name = (
+        settings.generation_fast_model if use_fast_model else settings.generation_model
+    )
+
     llm = ChatOpenAI(
-        model=settings.generation_model,
+        model=model_name,
         api_key=settings.openai_api_key,
         temperature=0.3,  # Lower temperature for consistent evaluation
     )
+
+    logger.info(f"Validating with model: {model_name}")
 
     # Build validation prompt
     system_prompt = VALIDATOR_SYSTEM_PROMPT
@@ -340,7 +373,34 @@ Proporciona tu evaluación en el siguiente formato JSON:
         end_idx = response_text.rfind("}") + 1
         if start_idx != -1 and end_idx > start_idx:
             json_text = response_text[start_idx:end_idx]
-            validation_result = json.loads(json_text)
+            try:
+                validation_result = json.loads(json_text)
+            except json.JSONDecodeError as e:
+                # Try to repair JSON - missing commas are common
+                logger.debug("[Generation] Attempting to repair malformed JSON: %s", str(e))
+                import re
+                # Fix missing comma after closing brace or quote before opening brace/key
+                repaired = re.sub(r'}\s*(?=["{])', '}, ', json_text)  # } followed by { or "
+                repaired = re.sub(r'"\s*(?=[}{])', '", ', repaired)  # " followed by { or }
+                repaired = re.sub(r'}\s*(?=")', '} ', repaired)  # } followed by " (for next key)
+
+                # Remove any double commas
+                repaired = re.sub(r',\s*,', ',', repaired)
+
+                try:
+                    validation_result = json.loads(repaired)
+                    logger.debug("[Generation] Successfully repaired JSON")
+                except json.JSONDecodeError:
+                    # If repair failed, log the response for debugging
+                    logger.warning("[Generation] JSON repair failed. Original response:\n%s", response_text)
+                    logger.warning("[Generation] Repaired attempt:\n%s", repaired)
+                    # Use defaults
+                    validation_result = {
+                        "score": 5,
+                        "breakdown": {},
+                        "feedback": "Could not parse validation response",
+                        "recommendation": "REVISAR",
+                    }
         else:
             msg = f"No JSON in validation response: {response_text}"
             logger.error(msg)
@@ -350,8 +410,8 @@ Proporciona tu evaluación en el siguiente formato JSON:
                 "feedback": "Validation failed",
                 "recommendation": "REVISAR",
             }
-    except json.JSONDecodeError as e:
-        msg = f"Validation JSON decode error: {e}\nResponse: {response_text}"
+    except Exception as e:
+        msg = f"Validation parsing error: {e}\nResponse: {response_text}"
         logger.exception(msg)
         validation_result = {
             "score": 5,
@@ -394,6 +454,16 @@ Proporciona tu evaluación en el siguiente formato JSON:
 
 def should_continue(state: GenerationState) -> str:
     """Decide whether to continue refining or end the workflow."""
+    # Skip validation for EASY exercises if configured (fast mode)
+    if (
+        settings.generation_skip_validation_for_easy
+        and state.difficulty_level == DifficultyLevel.EASY
+        and state.iteration_count == 1
+        and not state.is_approved
+    ):
+        logger.info("Skipping further validation for EASY exercise (fast mode enabled)")
+        return END
+
     # Check if approved
     if state.is_approved:
         logger.info("Exercise approved! Ending workflow.")
@@ -488,40 +558,77 @@ class GenerationService:
         max_iter = max_iterations or settings.generation_max_iterations
         quality_thresh = quality_threshold or settings.generation_quality_threshold
 
-        msg = (
-            f"Generating {exercise_type.value} exercise: "
-            f"grade={grade}, subject={subject}, topic={topic}, "
-            f"difficulty={difficulty_level.value}, max_iter={max_iter}, "
-            f"threshold={quality_thresh}"
+        logger.info(
+            "[Generation] Starting exercise generation: type=%s, difficulty=%s, grade=%d, subject=%s, topic=%s",
+            exercise_type.value,
+            difficulty_level.value,
+            grade,
+            subject,
+            topic[:50],
         )
-        logger.info(msg)
-        # Initialize state
-        initial_state = GenerationState(
-            exercise_type=exercise_type,
-            grade=grade,
-            subject=subject,
-            topic=topic,
-            difficulty_level=difficulty_level,
-            curriculum_context=curriculum_context,
-            max_iterations=max_iter,
-            quality_threshold=quality_thresh,
+        logger.info(
+            "[Generation] Parameters: max_iterations=%d, quality_threshold=%d, has_context=%s",
+            max_iter,
+            quality_thresh,
+            curriculum_context is not None,
         )
 
-        # Run the graph
-        final_state = self.graph.invoke(initial_state)
+        try:
+            import time
 
-        # Extract results
-        exercise_content = final_state["exercise_draft"]
-        validation_history = final_state["validation_history"]
-        iterations_used = final_state["iteration_count"]
+            start_time = time.time()
 
-        msg = (
-            f"Exercise generation complete: "
-            f"iterations={iterations_used}, "
-            f"final_score={final_state['validation_score']}"
-        )
+            # Initialize state
+            initial_state = GenerationState(
+                exercise_type=exercise_type,
+                grade=grade,
+                subject=subject,
+                topic=topic,
+                difficulty_level=difficulty_level,
+                curriculum_context=curriculum_context,
+                max_iterations=max_iter,
+                quality_threshold=quality_thresh,
+            )
 
-        return exercise_content, validation_history, iterations_used
+            # Run the graph
+            logger.info("[Generation] Invoking LangGraph workflow...")
+            final_state = self.graph.invoke(initial_state)
+            elapsed = time.time() - start_time
+
+            logger.info(
+                "[Generation] LangGraph workflow completed in %.2fs",
+                elapsed,
+            )
+
+            # Extract results
+            exercise_content = final_state["exercise_draft"]
+            validation_history = final_state["validation_history"]
+            iterations_used = final_state["iteration_count"]
+            final_score = final_state["validation_score"]
+
+            logger.info(
+                "[Generation] ✓ Exercise generation complete: iterations=%d, final_score=%d, elapsed=%.2fs",
+                iterations_used,
+                final_score,
+                elapsed,
+            )
+
+            logger.debug(
+                "[Generation] Exercise content preview: %s...",
+                str(exercise_content)[:200],
+            )
+
+            return exercise_content, validation_history, iterations_used
+
+        except Exception as e:
+            logger.error(
+                "[Generation] ✗ Exercise generation failed (type=%s, difficulty=%s): %s",
+                exercise_type.value,
+                difficulty_level.value,
+                str(e),
+            )
+            logger.exception("[Generation] Full error traceback:")
+            raise
 
     def validate_content_schema(
         self, exercise_type: ExerciseType, content: dict[str, Any]

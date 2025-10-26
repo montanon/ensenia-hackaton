@@ -29,71 +29,94 @@ export const BubbleChatWindow: React.FC = () => {
   const resizeStartRef = useRef({ x: 0, width: 0 });
 
   useEffect(() => {
-    if (!currentSession || !isChatOpen) return;
+    console.log('[BubbleChat] useEffect - currentSession:', currentSession?.id, 'isChatOpen:', isChatOpen);
+    if (!currentSession || !isChatOpen) {
+      console.log('[BubbleChat] Skipping WebSocket connection - no session or chat not open');
+      return;
+    }
 
-    // Connect WebSocket when chat opens
-    websocketService.connect(currentSession.id, {
-      onConnected: () => {
-        setIsConnected(true);
-      },
+    // Check if already connected to avoid duplicate connections
+    if (!websocketService.isConnected()) {
+      console.log('[BubbleChat] Connecting WebSocket');
+      // Connect WebSocket when chat opens
+      websocketService.connect(currentSession.id, {
+        onConnected: () => {
+          console.log('[BubbleChat] onConnected handler called');
+          setIsConnected(true);
+        },
 
-      onTextChunk: (msg) => {
-        appendStreamChunk(msg.content);
-      },
+        onTextChunk: (msg) => {
+          console.log('[BubbleChat] onTextChunk received:', msg.content.substring(0, 50) + '...');
+          appendStreamChunk(msg.content);
+        },
 
-      onMessageComplete: (msg) => {
-        completeStream(msg.message_id);
-      },
+        onMessageComplete: (msg) => {
+          console.log('[BubbleChat] onMessageComplete received:', msg.message_id);
+          completeStream(msg.message_id);
+        },
 
-      onAudioReady: (msg) => {
-        const audioUrl = `${API_URL}${msg.url}`;
-        setCurrentAudio(audioUrl);
+        onAudioReady: (msg) => {
+          console.log('[BubbleChat] onAudioReady received:', msg.url);
+          const audioUrl = `${API_URL}${msg.url}`;
+          setCurrentAudio(audioUrl);
 
-        // Auto-play if output mode is voice
-        if (outputMode === 'voice') {
-          if (audioRef.current) {
-            audioRef.current.pause();
-            audioRef.current = null;
+          // Auto-play if output mode is voice
+          if (outputMode === 'voice') {
+            console.log('[BubbleChat] Auto-playing audio in voice mode');
+            if (audioRef.current) {
+              audioRef.current.pause();
+              audioRef.current = null;
+            }
+
+            const audio = new Audio(audioUrl);
+            audioRef.current = audio;
+            setSpeaking(true);
+            setPlaying(true);
+
+            audio.onplay = () => setSpeaking(true);
+            audio.onended = () => {
+              setSpeaking(false);
+              setPlaying(false);
+              audioRef.current = null;
+            };
+            audio.onerror = (e) => {
+              console.error('[BubbleChat] Audio playback error:', e, audio.error);
+              setSpeaking(false);
+              setPlaying(false);
+              audioRef.current = null;
+            };
+
+            audio.play().catch(err => {
+              console.error('[BubbleChat] Audio playback failed:', err);
+              setSpeaking(false);
+              setPlaying(false);
+              audioRef.current = null;
+            });
           }
+        },
 
-          const audio = new Audio(audioUrl);
-          audioRef.current = audio;
-          setSpeaking(true);
-          setPlaying(true);
+        onModeChanged: () => {
+          // Mode changed
+        },
 
-          audio.onplay = () => setSpeaking(true);
-          audio.onended = () => {
-            setSpeaking(false);
-            setPlaying(false);
-            audioRef.current = null;
-          };
-          audio.onerror = () => {
-            setSpeaking(false);
-            setPlaying(false);
-            audioRef.current = null;
-          };
+        onError: (msg) => {
+          console.error('[BubbleChat] WebSocket error:', msg.message, 'Code:', msg.code);
+          
+          // Log configuration errors prominently
+          if (msg.code === 'TTS_NOT_CONFIGURED' || msg.code === 'STT_NOT_CONFIGURED') {
+            console.warn('[BubbleChat] Voice service not configured:', msg.message);
+          }
+        },
 
-          audio.play().catch(err => {
-            console.error('[BubbleChat] Audio playback failed:', err);
-            setSpeaking(false);
-            setPlaying(false);
-            audioRef.current = null;
-          });
-        }
-      },
-
-      onModeChanged: () => {
-        // Mode changed
-      },
-
-      onError: (msg) => {
-        console.error('[BubbleChat] WebSocket error:', msg.message);
-      },
-
-      onDisconnect: () => {
-        setIsConnected(false);
-      },
-    });
+        onDisconnect: () => {
+          setIsConnected(false);
+        },
+      });
+    } else {
+      console.log('[BubbleChat] WebSocket already connected');
+      // Already connected
+      setIsConnected(true);
+    }
 
     return () => {
       // Don't disconnect on unmount, keep connection alive

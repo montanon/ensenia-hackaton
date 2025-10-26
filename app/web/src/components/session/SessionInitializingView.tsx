@@ -111,7 +111,7 @@ export const SessionInitializingView: React.FC = () => {
         <div className="flex items-center justify-between p-3 bg-white rounded-lg border border-gray-200">
           <span className="flex items-center gap-3 text-gray-700">
             <svg className="w-5 h-5 text-blue-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6.253v13m0-13C6.5 6.253 2 10.998 2 17.25m20-11.002c5.5 0 10 4.745 10 10.007M15 6.75h.008v.008H15V6.75z" />
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
             </svg>
             <span>Contenido de aprendizaje</span>
           </span>
@@ -120,8 +120,9 @@ export const SessionInitializingView: React.FC = () => {
               <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
             </svg>
           ) : (
-            <svg className="w-5 h-5 text-gray-400 animate-spin" fill="currentColor" viewBox="0 0 20 20">
-              <path d="M4.555 5.659c0 1.456.91 2.734 2.216 3.272-.056.682-.496 4.573-1.979 5.951-1.527 1.44.632 3.645 2.5 2.915 1.808-.715 4.062-1.86 5.204-3.857 1.142 1.997 3.396 3.142 5.204 3.857 1.868.73 4.027-1.475 2.5-2.915-1.483-1.378-1.923-5.269-1.979-5.951 1.306-.538 2.216-1.816 2.216-3.272 0-1.71-1.944-3.051-4.154-3.051-.39 0-.779.045-1.156.141A4.065 4.065 0 0012 1c-2.62 0-4.956 1.036-6.222 2.247-.377-.096-.766-.141-1.156-.141-2.21 0-4.154 1.34-4.154 3.051z" />
+            <svg className="w-5 h-5 text-blue-500 animate-spin" fill="none" viewBox="0 0 24 24">
+              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="2" />
+              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
             </svg>
           )}
         </div>
@@ -130,7 +131,7 @@ export const SessionInitializingView: React.FC = () => {
         <div className="flex items-center justify-between p-3 bg-white rounded-lg border border-gray-200">
           <span className="flex items-center gap-3 text-gray-700">
             <svg className="w-5 h-5 text-blue-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
             </svg>
             <span>Guía de estudio</span>
           </span>
@@ -139,8 +140,9 @@ export const SessionInitializingView: React.FC = () => {
               <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
             </svg>
           ) : (
-            <svg className="w-5 h-5 text-gray-400 animate-spin" fill="currentColor" viewBox="0 0 20 20">
-              <path d="M4.555 5.659c0 1.456.91 2.734 2.216 3.272-.056.682-.496 4.573-1.979 5.951-1.527 1.44.632 3.645 2.5 2.915 1.808-.715 4.062-1.86 5.204-3.857 1.142 1.997 3.396 3.142 5.204 3.857 1.868.73 4.027-1.475 2.5-2.915-1.483-1.378-1.923-5.269-1.979-5.951 1.306-.538 2.216-1.816 2.216-3.272 0-1.71-1.944-3.051-4.154-3.051-.39 0-.779.045-1.156.141A4.065 4.065 0 0012 1c-2.62 0-4.956 1.036-6.222 2.247-.377-.096-.766-.141-1.156-.141-2.21 0-4.154 1.34-4.154 3.051z" />
+            <svg className="w-5 h-5 text-blue-500 animate-spin" fill="none" viewBox="0 0 24 24">
+              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="2" />
+              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
             </svg>
           )}
         </div>

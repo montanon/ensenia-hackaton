@@ -24,8 +24,17 @@ export async function handleGenerate(
   try {
     // Parse and validate request
     const body = await parseJsonBody<GenerateRequest>(request);
+    console.log('[Worker] RAG Generation initiated:', {
+      query: body.query,
+      grade: body.grade,
+      subject: body.subject,
+      style: body.style || 'explanation',
+      oa_codes: body.oa_codes || [],
+      context_length: body.context?.length || 0,
+    });
 
     if (!body.context || body.context.length < 10) {
+      console.warn('[Worker] Invalid context - too short:', body.context?.length);
       return errorResponse(
         400,
         'INVALID_CONTEXT',
@@ -34,6 +43,7 @@ export async function handleGenerate(
     }
 
     if (!body.query || body.query.length < 3) {
+      console.warn('[Worker] Invalid query - too short:', body.query);
       return errorResponse(
         400,
         'INVALID_QUERY',
@@ -42,6 +52,7 @@ export async function handleGenerate(
     }
 
     if (!body.grade || body.grade < 1 || body.grade > 12) {
+      console.warn('[Worker] Invalid grade:', body.grade);
       return errorResponse(
         400,
         'INVALID_GRADE',
@@ -50,13 +61,22 @@ export async function handleGenerate(
     }
 
     if (!body.subject) {
+      console.warn('[Worker] Missing subject');
       return errorResponse(400, 'INVALID_SUBJECT', 'Subject is required');
     }
 
     const style = body.style || 'explanation';
     const oaCodes = body.oa_codes || [];
 
+    console.log('[Worker] RAG context received:');
+    console.log('  - Context length:', body.context.length, 'characters');
+    console.log('  - Student grade:', body.grade, '°');
+    console.log('  - Subject:', body.subject);
+    console.log('  - Style:', style);
+    console.log('  - OA Codes:', oaCodes.join(', ') || 'None');
+
     // Build Chilean-context prompt
+    console.log('[Worker] Building Chilean-context prompt with RAG context');
     const prompt = buildChileanPrompt(
       body.context,
       body.query,
@@ -66,20 +86,31 @@ export async function handleGenerate(
       style
     );
 
+    console.log('[Worker] Prompt constructed. Length:', prompt.length, 'characters');
+    console.log('[Worker] Calling Workers AI with model:', env.GENERATION_MODEL);
+
     // Generate text using Workers AI
+    const aiStartTime = Date.now();
     const aiResponse = (await env.AI.run(env.GENERATION_MODEL, {
       prompt,
       max_tokens: 500,
       temperature: 0.7,
     })) as AiTextGenerationResponse;
 
+    const aiDuration = Date.now() - aiStartTime;
+    console.log('[Worker] AI generation completed in', aiDuration, 'ms');
+
     if (!aiResponse.response) {
+      console.error('[Worker] AI model returned empty response');
       return errorResponse(
         500,
         'GENERATION_FAILED',
         'AI model did not return a response'
       );
     }
+
+    console.log('[Worker] Generated response length:', aiResponse.response.length, 'characters');
+    console.log('[Worker] Generated text preview:', aiResponse.response.substring(0, 100) + '...');
 
     // Prepare response
     const response: GenerateResponse = {
@@ -89,9 +120,10 @@ export async function handleGenerate(
       generation_time_ms: Date.now() - startTime,
     };
 
+    console.log('[Worker] Generation completed in', Date.now() - startTime, 'ms');
     return jsonResponse(response);
   } catch (error: any) {
-    console.error('Generation error:', error);
+    console.error('[Worker] Generation error:', error);
     return errorResponse(
       500,
       'GENERATION_FAILED',

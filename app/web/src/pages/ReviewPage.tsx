@@ -32,17 +32,12 @@ export const ReviewPage: React.FC = () => {
   const [guideLoading, setGuideLoading] = useState(false);
   const [guideError, setGuideError] = useState<string | null>(null);
 
-  // Show initializing view while session is being set up
-  if (isInitializing) {
-    return <SessionInitializingView />;
-  }
-
   // Load study guide when session changes
   useEffect(() => {
-    if (currentSession) {
+    if (currentSession && !isInitializing) {
       loadStudyGuide();
     }
-  }, [currentSession]);
+  }, [currentSession, isInitializing]);
 
   const loadStudyGuide = async () => {
     if (!currentSession) return;
@@ -64,6 +59,11 @@ export const ReviewPage: React.FC = () => {
       setGuideLoading(false);
     }
   };
+
+  // Show initializing view while session is being set up
+  if (isInitializing) {
+    return <SessionInitializingView />;
+  }
 
   return (
     <div className="h-full overflow-auto bg-gray-50">

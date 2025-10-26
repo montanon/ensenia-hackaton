@@ -60,7 +60,12 @@ class DeepgramService:
         """Initialize the Deepgram client."""
         self.api_key = settings.deepgram_api_key
         if not self.api_key:
-            logger.warning("Deepgram API key not configured")
+            logger.warning(
+                "Deepgram API key not configured. STT features will not work. "
+                "Set DEEPGRAM_API_KEY environment variable."
+            )
+        else:
+            logger.info("Deepgram API key configured")
 
         self.client = AsyncDeepgramClient(api_key=self.api_key)
         self.language = getattr(settings, "stt_language", "es")  # Chilean Spanish
@@ -85,6 +90,11 @@ class DeepgramService:
             TranscriptionResult objects with transcript and is_final flag
 
         """
+        if not self.api_key:
+            error_msg = "Deepgram API key not configured. Cannot transcribe audio."
+            logger.error(error_msg)
+            raise ValueError(error_msg)
+
         try:
             logger.info("Initiating Deepgram streaming connection")
 

@@ -185,6 +185,10 @@ class GenerateExerciseRequest(BaseModel):
         max_length=2000,
         description="Additional curriculum context from research",
     )
+    force_new: bool = Field(
+        default=False,
+        description="If True, skip reusing existing exercises and generate new one",
+    )
 
 
 class SearchExercisesRequest(BaseModel):
@@ -259,10 +263,24 @@ class ExerciseResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
 
+class ExerciseWithSessionInfo(BaseModel):
+    """Exercise response with session link information."""
+
+    exercise: ExerciseResponse = Field(..., description="The exercise details")
+    exercise_session_id: int = Field(..., description="ID of the exercise-session link")
+
+
 class ExerciseListResponse(BaseModel):
     """Response schema for a list of exercises."""
 
     exercises: list[ExerciseResponse] = Field(..., description="List of exercises")
+    total: int = Field(..., description="Total number of exercises found")
+
+
+class SessionExercisesListResponse(BaseModel):
+    """Response schema for exercises linked to a session."""
+
+    exercises: list[ExerciseWithSessionInfo] = Field(..., description="List of exercises with session info")
     total: int = Field(..., description="Total number of exercises found")
 
 

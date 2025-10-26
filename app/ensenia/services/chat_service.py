@@ -94,8 +94,17 @@ class ChatService:
         """Initialize the OpenAI client."""
         self.client = AsyncOpenAI(api_key=settings.openai_api_key)
         self.model = settings.openai_model
-        self.max_tokens = settings.openai_max_tokens
+        # Cap max_tokens at 4096 for gpt-3.5-turbo compatibility
+        # gpt-4-turbo-preview supports more, but gpt-3.5-turbo only supports 4096
+        self.max_tokens = min(settings.openai_max_tokens, 4096)
         self.temperature = settings.openai_temperature
+
+        logger.info(
+            "[ChatService] Initialized with model=%s, max_tokens=%d (configured: %d)",
+            self.model,
+            self.max_tokens,
+            settings.openai_max_tokens,
+        )
 
     def _build_system_prompt(
         self, mode: str, grade: int, subject: str, research_context: str | None
@@ -295,9 +304,13 @@ class ChatService:
                 stream=True,
             )
 
+            chunk_count = 0
             async for chunk in stream:
                 if chunk.choices[0].delta.content:
-                    yield chunk.choices[0].delta.content
+                    content = chunk.choices[0].delta.content
+                    chunk_count += 1
+                    logger.debug(f"[ChatService] Yielding chunk {chunk_count}: {len(content)} chars")
+                    yield content
 
         except Exception:
             logger.exception("Error in streaming chat completion")
