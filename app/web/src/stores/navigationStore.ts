@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 
-export type PageType = 'learn' | 'practice' | 'review' | 'evaluacion';
+export type PageType = 'landing' | 'login' | 'learn' | 'practice' | 'review' | 'evaluacion';
 
 interface NavigationStore {
   currentPage: PageType;
@@ -8,6 +8,6 @@ interface NavigationStore {
 }
 
 export const useNavigationStore = create<NavigationStore>((set) => ({
-  currentPage: 'learn',
+  currentPage: 'landing',
   setCurrentPage: (page) => set({ currentPage: page }),
 }));
