@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useRef } from 'react';
+import React, { useEffect, useState, useRef, useCallback } from 'react';
 import { useSessionStore } from '../../stores/sessionStore';
 import { useChatStore } from '../../stores/chatStore';
 import { useAudioStore } from '../../stores/audioStore';
@@ -29,6 +29,7 @@ export const ChatTab: React.FC = () => {
   } = useExerciseStore();
   const [isConnected, setIsConnected] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [partialTranscript, setPartialTranscript] = useState<string>('');
   const audioRef = useRef<HTMLAudioElement | null>(null);
 
   const handleGenerateExercise = async () => {
@@ -70,6 +71,23 @@ export const ChatTab: React.FC = () => {
     return exerciseApi.submit(exerciseSessionId, { answer });
   };
 
+  const handleSendMessage = useCallback((message: string) => {
+    if (!currentSession || !isConnected) return;
+
+    // Add user message to store
+    addMessage({
+      role: 'user',
+      content: message,
+      timestamp: new Date().toISOString(),
+    });
+
+    // Start streaming
+    startStreaming();
+
+    // Send via WebSocket
+    websocketService.sendMessage(message);
+  }, [currentSession, isConnected, addMessage, startStreaming]);
+
   useEffect(() => {
     if (!currentSession) return;
 
@@ -94,6 +112,18 @@ export const ChatTab: React.FC = () => {
 
       onMessageComplete: (msg) => {
         completeStream(msg.message_id);
+      },
+
+      onSTTPartial: (msg) => {
+        console.log('[ChatTab] STT partial received:', msg.transcript);
+        setPartialTranscript(msg.transcript);
+      },
+
+      onSTTResult: (msg) => {
+        console.log('[ChatTab] STT result received:', msg.transcript);
+        setPartialTranscript('');
+        // Automatically send the transcribed text as a message
+        handleSendMessage(msg.transcript);
       },
 
       onAudioReady: (msg) => {
@@ -172,10 +202,11 @@ export const ChatTab: React.FC = () => {
       // Clean up audio if playing
       if (audioRef.current) {
         audioRef.current.pause();
+        audioRef.current.src = '';
         audioRef.current = null;
       }
     };
-  }, [currentSession, outputMode, appendStreamChunk, completeStream, setCurrentAudio, setSpeaking, setPlaying]);
+  }, [currentSession, outputMode, appendStreamChunk, completeStream, setCurrentAudio, setSpeaking, setPlaying, handleSendMessage]);
 
   // Update WebSocket mode when output mode changes
   useEffect(() => {
@@ -186,23 +217,6 @@ export const ChatTab: React.FC = () => {
       websocketService.setMode(wsMode);
     }
   }, [outputMode, isConnected, currentSession]);
-
-  const handleSendMessage = (message: string) => {
-    if (!currentSession || !isConnected) return;
-
-    // Add user message to store
-    addMessage({
-      role: 'user',
-      content: message,
-      timestamp: new Date().toISOString(),
-    });
-
-    // Start streaming
-    startStreaming();
-
-    // Send via WebSocket
-    websocketService.sendMessage(message);
-  };
 
   if (!currentSession) {
     return null;
@@ -314,6 +328,19 @@ export const ChatTab: React.FC = () => {
 
       {/* Messages */}
       <MessageList />
+
+      {/* Live Transcription Display */}
+      {partialTranscript && (
+        <div className="px-6 py-3 bg-blue-50 border-t border-blue-200">
+          <div className="text-sm text-gray-600 mb-1">
+            <span className="inline-flex items-center gap-1">
+              <span className="inline-block w-2 h-2 bg-blue-500 rounded-full animate-pulse"></span>
+              Transcribiendo...
+            </span>
+          </div>
+          <p className="text-sm text-blue-900 italic">{partialTranscript}</p>
+        </div>
+      )}
 
       {/* Input */}
       <ChatInput

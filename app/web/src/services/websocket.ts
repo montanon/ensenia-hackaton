@@ -18,7 +18,7 @@ const MAX_RECONNECT_ATTEMPTS = 5;
 const INITIAL_RECONNECT_DELAY_MS = 1000;
 const PING_INTERVAL_MS = 30000;
 
-type MessageHandler = {
+export type MessageHandler = {
   onConnected?: (msg: WSConnectedMessage) => void;
   onTextChunk?: (msg: WSTextChunkMessage) => void;
   onAudioReady?: (msg: WSAudioReadyMessage) => void;
@@ -38,6 +38,7 @@ export class WebSocketService {
   private maxReconnectAttempts = MAX_RECONNECT_ATTEMPTS;
   private reconnectDelay = INITIAL_RECONNECT_DELAY_MS;
   private pingInterval: number | null = null;
+  private additionalHandlers: MessageHandler = {};
 
   connect(sessionId: number, handlers: MessageHandler): void {
     this.sessionId = sessionId;
@@ -75,27 +76,35 @@ export class WebSocketService {
     switch (message.type) {
       case 'connected':
         this.handlers.onConnected?.(message);
+        this.additionalHandlers.onConnected?.(message);
         break;
       case 'text_chunk':
         this.handlers.onTextChunk?.(message);
+        this.additionalHandlers.onTextChunk?.(message);
         break;
       case 'audio_ready':
         this.handlers.onAudioReady?.(message);
+        this.additionalHandlers.onAudioReady?.(message);
         break;
       case 'stt_partial':
         this.handlers.onSTTPartial?.(message);
+        this.additionalHandlers.onSTTPartial?.(message);
         break;
       case 'stt_result':
         this.handlers.onSTTResult?.(message);
+        this.additionalHandlers.onSTTResult?.(message);
         break;
       case 'mode_changed':
         this.handlers.onModeChanged?.(message);
+        this.additionalHandlers.onModeChanged?.(message);
         break;
       case 'message_complete':
         this.handlers.onMessageComplete?.(message);
+        this.additionalHandlers.onMessageComplete?.(message);
         break;
       case 'error':
         this.handlers.onError?.(message);
+        this.additionalHandlers.onError?.(message);
         break;
       case 'pong':
         // Ping response received
@@ -127,6 +136,21 @@ export class WebSocketService {
 
   sendAudioEnd(): void {
     this.send({ type: 'audio_end' });
+  }
+
+  /**
+   * Register additional message handlers (for components like VoiceButton)
+   * Allows multiple listeners for the same message types
+   */
+  registerAdditionalHandlers(handlers: MessageHandler): void {
+    this.additionalHandlers = handlers;
+  }
+
+  /**
+   * Unregister additional message handlers
+   */
+  unregisterAdditionalHandlers(): void {
+    this.additionalHandlers = {};
   }
 
   private startPing(): void {

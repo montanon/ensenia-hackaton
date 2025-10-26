@@ -1,4 +1,4 @@
-import React, { useState, type KeyboardEvent } from 'react';
+import React, { useState, useCallback, type KeyboardEvent } from 'react';
 import { useSessionStore } from '../../stores/sessionStore';
 import { VoiceButton } from './VoiceButton';
 
@@ -11,25 +11,25 @@ export const ChatInput: React.FC<ChatInputProps> = ({ onSendMessage, disabled })
   const [message, setMessage] = useState('');
   const { inputMode } = useSessionStore();
 
-  const handleSend = () => {
+  const handleSend = useCallback(() => {
     if (message.trim() && !disabled) {
       onSendMessage(message.trim());
       setMessage('');
     }
-  };
+  }, [message, disabled, onSendMessage]);
 
-  const handleKeyPress = (e: KeyboardEvent<HTMLTextAreaElement>) => {
+  const handleKeyPress = useCallback((e: KeyboardEvent<HTMLTextAreaElement>) => {
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
       handleSend();
     }
-  };
+  }, [handleSend]);
 
-  const handleVoiceTranscript = (text: string) => {
+  const handleVoiceTranscript = useCallback((text: string) => {
     if (text.trim() && !disabled) {
       onSendMessage(text.trim());
     }
-  };
+  }, [onSendMessage, disabled]);
 
   return (
     <div className="border-t border-gray-200 bg-white">
