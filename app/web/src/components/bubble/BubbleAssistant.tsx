@@ -116,15 +116,8 @@ export const BubbleAssistant: React.FC = () => {
   }
 
   return (
-    <div className="fixed bottom-12 right-12 z-50 flex flex-col items-center gap-2">
-      {/* Live Transcript */}
-      {transcript && (
-        <div className="max-w-xs p-3 bg-white border border-gray-200 rounded-lg shadow-lg mb-2 bubble-transcript">
-          <p className="text-sm text-gray-900">{transcript}</p>
-        </div>
-      )}
-
-      {/* Bubble */}
+    <div className="fixed bottom-12 right-12 z-50">
+      {/* Bubble - Fixed size and position to prevent layout shifts */}
       <button
         type="button"
         onMouseDown={handleMouseDown}
@@ -134,24 +127,24 @@ export const BubbleAssistant: React.FC = () => {
         onTouchEnd={handleMouseUp}
         className={cn(
           'bubble-assistant',
-          `bubble-${bubbleState}`,
           'w-20 h-20 bg-gradient-to-br from-blue-500 to-blue-600',
           'shadow-lg hover:shadow-xl cursor-pointer',
           'flex items-center justify-center',
           'focus:outline-none focus:ring-4 focus:ring-blue-300',
           'relative overflow-visible',
-          'transition-all duration-300 ease-in-out',
-          isChatOpen && 'scale-0 opacity-0'
+          'transition-shadow duration-200 ease-in-out',
+          isChatOpen && 'opacity-0 pointer-events-none'
         )}
         aria-label={isChatOpen ? 'Close assistant' : 'Open assistant'}
         style={{
-          willChange: 'transform, border-radius',
-          transformOrigin: 'center center'
+          willChange: 'transform',
+          transformOrigin: 'center center',
+          transition: isChatOpen ? 'opacity 300ms ease-in-out' : 'none'
         }}
       >
         {/* Glow effect for listening */}
         {isListening && (
-          <div className="absolute inset-0 bg-red-400 opacity-30 animate-pulse" />
+          <div className="absolute inset-0 bg-red-400 opacity-30 animate-pulse rounded-full" />
         )}
 
         {/* Icon */}
@@ -159,21 +152,32 @@ export const BubbleAssistant: React.FC = () => {
           src={microphoneIcon}
           alt="Microphone"
           className={cn(
-            'w-10 h-10 relative z-10',
-            isListening && 'scale-110 animate-pulse',
+            'w-10 h-10 relative z-10 transition-transform duration-200',
+            isListening && 'scale-110',
             isSpeaking && 'scale-105'
           )}
         />
       </button>
 
-      {/* Status indicator */}
+      {/* Transcript - Absolute positioned to not affect bubble */}
+      {transcript && (
+        <div className="absolute bottom-24 left-1/2 -translate-x-1/2 mb-2 whitespace-nowrap pointer-events-none">
+          <div className="max-w-xs p-3 bg-white border border-gray-200 rounded-lg shadow-lg">
+            <p className="text-sm text-gray-900">{transcript}</p>
+          </div>
+        </div>
+      )}
+
+      {/* Status indicator - Absolute positioned to not affect bubble */}
       {!isChatOpen && (
-        <div className="text-xs text-gray-600 bg-white px-3 py-1.5 rounded-full shadow-sm text-center">
-          {isListening
-            ? 'Escuchando...'
-            : isSpeaking
-            ? 'Hablando...'
-            : 'Click o mantén presionado'}
+        <div className="absolute top-24 left-1/2 -translate-x-1/2 mt-2 whitespace-nowrap pointer-events-none">
+          <div className="text-xs text-gray-600 bg-white px-3 py-1.5 rounded-full shadow-sm">
+            {isListening
+              ? 'Escuchando...'
+              : isSpeaking
+              ? 'Hablando...'
+              : 'Click o mantén presionado'}
+          </div>
         </div>
       )}
     </div>

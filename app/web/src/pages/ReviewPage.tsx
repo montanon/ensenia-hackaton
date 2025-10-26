@@ -1,8 +1,14 @@
 import React from 'react';
 import { useSessionStore } from '../stores/sessionStore';
+import { SessionInitializingView } from '../components/session/SessionInitializingView';
 
 export const ReviewPage: React.FC = () => {
-  const { currentSession } = useSessionStore();
+  const { currentSession, isInitializing } = useSessionStore();
+
+  // Show initializing view while session is being set up
+  if (isInitializing) {
+    return <SessionInitializingView />;
+  }
 
   return (
     <div className="h-full overflow-auto bg-gray-50">

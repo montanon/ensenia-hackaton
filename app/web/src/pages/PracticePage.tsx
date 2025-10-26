@@ -1,12 +1,13 @@
 import React from 'react';
 import { useSessionStore } from '../stores/sessionStore';
 import { useExerciseStore } from '../stores/exerciseStore';
+import { SessionInitializingView } from '../components/session/SessionInitializingView';
 import { ExerciseCard } from '../components/exercises/ExerciseCard';
 import { exerciseApi } from '../services/api';
 import { Button } from '../components/ui/Button';
 
 export const PracticePage: React.FC = () => {
-  const { currentSession } = useSessionStore();
+  const { currentSession, isInitializing } = useSessionStore();
   const {
     currentExercise,
     exerciseSessionId,
@@ -14,6 +15,11 @@ export const PracticePage: React.FC = () => {
     setCurrentExercise,
     setGenerating,
   } = useExerciseStore();
+
+  // Show initializing view while session is being set up
+  if (isInitializing) {
+    return <SessionInitializingView />;
+  }
 
   const handleGenerateExercise = async () => {
     if (!currentSession) return;

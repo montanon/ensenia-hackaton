@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 
-export type PageType = 'landing' | 'login' | 'learn' | 'practice' | 'review' | 'evaluacion';
+export type PageType = 'landing' | 'login' | 'learn' | 'practice' | 'review' | 'study' | 'evaluacion';
 
 interface NavigationStore {
   currentPage: PageType;
