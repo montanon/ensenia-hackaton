@@ -75,8 +75,10 @@ class Settings(BaseSettings):
     openai_temperature: float = 0.4
 
     # Exercise Generation Settings
-    generation_max_iterations: int = 3
-    generation_quality_threshold: int = 8
+    generation_max_iterations: int = (
+        1  # Reduced for performance (30s → 10s per exercise)
+    )
+    generation_quality_threshold: int = 6
     generation_model: str = "gpt-4-turbo-preview"
 
     # Cache Directory

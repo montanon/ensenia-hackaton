@@ -135,6 +135,32 @@ async def generate_exercise(
         )
         logger.info(msg)
 
+        # First, check for existing high-quality exercise to reuse
+        existing_exercises = await repository.search_exercises(
+            db,
+            grade=request.grade,
+            subject=request.subject,
+            topic=request.topic,
+            exercise_type=request.exercise_type,
+            difficulty_level=request.difficulty_level,
+            limit=1,
+        )
+
+        # Reuse existing exercise if it meets quality threshold
+        if existing_exercises and existing_exercises[0].validation_score >= 8:
+            exercise = existing_exercises[0]
+            msg = f"Reusing existing exercise {exercise.id} (score: {exercise.validation_score})"
+            logger.info(msg)
+
+            return GenerateExerciseResponse(
+                exercise=db_exercise_to_response(exercise),
+                validation_history=[],
+                iterations_used=0,
+            )
+
+        # No suitable exercise found, generate new one
+        logger.info("No suitable exercise found in cache, generating new one...")
+
         # Generate exercise using LangGraph
         (
             content,
