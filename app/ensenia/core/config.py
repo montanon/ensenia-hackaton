@@ -52,6 +52,9 @@ class Settings(BaseSettings):
     elevenlabs_voice_id: str = "pNInz6obpgDQGcFmaJgB"  # Dorothy - Chilean Spanish
     elevenlabs_model_id: str = "eleven_turbo_v2_5"
 
+    # DeepGram Speech-to-Text
+    deepgram_api_key: str = ""
+
     # Audio Configuration
     audio_format: str = "mp3_44100_128"
 
@@ -74,9 +77,20 @@ class Settings(BaseSettings):
     openai_max_tokens: int = 2000
     openai_temperature: float = 0.4
 
+    # Speech-to-Text Configuration
+    stt_provider: str = "deepgram"  # "deepgram" or "whisper"
+    stt_language: str = "es"  # Chilean Spanish
+
+    # OpenAI Whisper (Speech-to-Text) - Fallback
+    stt_model: str = "whisper-1"
+
+    # Deepgram (Streaming Speech-to-Text)
+
     # Exercise Generation Settings
-    generation_max_iterations: int = 3
-    generation_quality_threshold: int = 8
+    generation_max_iterations: int = (
+        1  # Reduced for performance (30s → 10s per exercise)
+    )
+    generation_quality_threshold: int = 6
     generation_model: str = "gpt-4-turbo-preview"
 
     # Cache Directory
@@ -105,6 +119,10 @@ class Settings(BaseSettings):
     # Workers AI
     workers_ai_embedding_model: str = "@cf/baai/bge-base-en-v1.5"
     workers_ai_embedding_dimensions: int = 768
+    workers_ai_timeout_connect: int = 10  # seconds to establish connection
+    workers_ai_timeout_read: int = 60  # seconds to read response
+    workers_ai_timeout_write: int = 120  # seconds to send request (large text chunks)
+    workers_ai_timeout_pool: int = 10  # seconds to acquire connection from pool
 
     @field_validator("api_cors_origins", mode="after")
     @classmethod

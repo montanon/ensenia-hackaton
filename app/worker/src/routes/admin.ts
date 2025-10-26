@@ -41,6 +41,10 @@ export async function handlePopulateVectorize(
   const startTime = Date.now();
 
   try {
+    if (!isAuthorized(request, env)) {
+      return errorResponse(401, 'UNAUTHORIZED', 'Acceso no autorizado al endpoint admin');
+    }
+
     // Step 1: Fetch all curriculum content
     const query = `
       SELECT
@@ -158,4 +162,22 @@ export async function handlePopulateVectorize(
       error instanceof Error ? error.message : 'Failed to populate Vectorize'
     );
   }
+}
+
+function isAuthorized(request: Request, env: Env): boolean {
+  const token = env.ADMIN_API_TOKEN;
+  if (!token) {
+    return false;
+  }
+
+  const headerToken =
+    request.headers.get('x-admin-token') ||
+    request.headers.get('authorization') ||
+    '';
+
+  if (headerToken.startsWith('Bearer ')) {
+    return headerToken.slice(7) === token;
+  }
+
+  return headerToken === token;
 }

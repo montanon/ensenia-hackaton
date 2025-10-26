@@ -19,7 +19,7 @@ database_id = "f9ed2222-8b21-4950-8c35-cb92677c7d23"
 # Vectorize Binding - Using existing index
 [[vectorize]]
 binding = "VECTOR_INDEX"
-index_name = "ai-search-basic-rag"
+index_name = "ensenia-hackaton-vectorize"
 
 # KV Namespace for Caching
 [[kv_namespaces]]
@@ -30,12 +30,13 @@ preview_id = "da0ef0a0bd7943818fd185272bc5ff3d"
 # Environment Variables
 [vars]
 ENVIRONMENT = "development"
-EMBEDDING_MODEL = "@cf/baai/bge-large-en-v1.5"  # Changed to large (1024 dims) to match your Vectorize
+EMBEDDING_MODEL = "@cf/baai/bge-base-en-v1.5"  # Base model (768 dims) to match Vectorize index
 GENERATION_MODEL = "@cf/meta/llama-3.1-8b-instruct"
-VECTOR_DIMENSION = "1024"  # Updated to match your Vectorize index
+VECTOR_DIMENSION = "768"  # Updated to match your Vectorize index (768 dims)
 CACHE_TTL_HOT = "3600"      # 1 hour for frequent queries
 CACHE_TTL_WARM = "86400"    # 24 hours for regular content
 CACHE_TTL_COLD = "604800"   # 7 days for static data
+ADMIN_API_TOKEN = "hackathon-admin-202asdfasd"
 
 # Development Configuration
 [env.development]

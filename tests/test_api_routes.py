@@ -35,30 +35,31 @@ class TestChatRoutes:
         assert data["mode"] == "learn"
 
     async def test_create_session_with_research(self, client):
-        """Test creating session with initial research topic."""
-        with patch(
-            "app.ensenia.services.research_service._get_http_client"
-        ) as mock_client_fn:
-            mock_http = AsyncMock()
-            mock_response = MagicMock()
-            mock_response.status_code = 200
-            mock_response.json.return_value = {"results": []}
-            mock_http.post.return_value = mock_response
-            mock_client_fn.return_value = mock_http
+        """Test creating session with initial research topic.
 
-            response = await client.post(
-                "/chat/sessions",
-                json={
-                    "grade": 8,
-                    "subject": "Science",
-                    "mode": "learn",
-                    "topic": "photosynthesis",
-                },
-            )
+        Note: Research context is loaded asynchronously by the Worker AI in background.
+        The session creation endpoint returns immediately with context_loaded=False.
+        Use the GET /sessions/{id}/status endpoint to poll for initialization completion.
+        """
+        response = await client.post(
+            "/chat/sessions",
+            json={
+                "grade": 8,
+                "subject": "Science",
+                "mode": "learn",
+                "topic": "photosynthesis",
+            },
+        )
 
-            assert response.status_code == 200
-            data = response.json()
-            assert data["context_loaded"] is True
+        assert response.status_code == 200
+        data = response.json()
+
+        # Context is loaded asynchronously by Worker AI, so initially False
+        assert data["context_loaded"] is False
+        # Verify session was created with correct params
+        assert data["grade"] == 8
+        assert data["subject"] == "Science"
+        assert data["mode"] == "learn"
 
     async def test_create_session_invalid_grade(self, client):
         """Test creating session with invalid grade."""

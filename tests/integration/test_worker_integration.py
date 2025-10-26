@@ -200,12 +200,12 @@ class TestWorkerIntegration:
         """Test successful content validation with valid response."""
         mock_response_data = {
             "is_valid": True,
-            "score": 0.87,
+            "score": 87,
             "validation_details": {
-                "oa_alignment_score": 0.9,
-                "grade_appropriate_score": 0.85,
-                "chilean_terminology_score": 0.9,
-                "learning_coverage_score": 0.83,
+                "oa_alignment_score": 90,
+                "grade_appropriate_score": 85,
+                "chilean_terminology_score": 92,
+                "learning_coverage_score": 83,
                 "issues": [],
                 "recommendations": ["Agregar más ejemplos"],
             },
@@ -235,8 +235,8 @@ class TestWorkerIntegration:
             # Verify Pydantic model
             assert isinstance(result, ValidateResponse)
             assert result.is_valid is True
-            assert result.score == 0.87
-            assert result.validation_details.oa_alignment_score == 0.9
+            assert result.score == 87
+            assert result.validation_details.oa_alignment_score == 90
             assert len(result.validation_details.recommendations) > 0
 
     async def test_worker_timeout_error(self):

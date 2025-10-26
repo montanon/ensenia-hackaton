@@ -119,6 +119,40 @@ RECOMMENDATIONS: Mejorar alineación con OAs`,
       expect(body.validation_details).toHaveProperty('recommendations');
     });
 
+    it('should penalize when expected OA are missing from output', async () => {
+      // Simulate Worker response that never mentions the requested OA
+      env.AI.run = async () => ({
+        response: `OA_SCORE: 90
+GRADE_SCORE: 92
+CHILEAN_SCORE: 91
+COVERAGE_SCORE: 89
+ISSUES: ninguno
+RECOMMENDATIONS: Mantener el enfoque pedagógico`,
+      });
+
+      // Simulate DB missing the OA as well
+      env.DB.prepare = () => ({
+        bind: () => ({
+          all: async () => ({
+            success: true,
+            results: [],
+          }),
+        }),
+      }) as any;
+
+      const request = new Request('http://test.com/validate', {
+        method: 'POST',
+        body: JSON.stringify(validValidateRequest),
+        headers: { 'Content-Type': 'application/json' },
+      });
+
+      const response = await handleValidate(request, env);
+      const body = await response.json();
+
+      expect(body.validation_details.issues[0]).toContain('OA');
+      expect(body.validation_details.oa_alignment_score).toBeLessThan(90);
+    });
+
     it('should parse issues from AI response', async () => {
       env.AI.run = async () => ({
         response: `OA_SCORE: 60

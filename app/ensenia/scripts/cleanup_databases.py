@@ -306,6 +306,7 @@ class DatabaseCleaner:
 
         Returns:
             True if successful, False otherwise
+
         """
         msg = "\n" + "=" * 60
         logger.info(msg)
@@ -484,7 +485,9 @@ Examples:
     clean_r2_bucket = args.all or args.r2
     clean_kv_namespace = args.all or args.kv
 
-    if not (clean_pg or clean_d1_db or clean_vz or clean_r2_bucket or clean_kv_namespace):
+    if not (
+        clean_pg or clean_d1_db or clean_vz or clean_r2_bucket or clean_kv_namespace
+    ):
         parser.error("Specify at least one database to clean or use --all")
 
     # Confirmation prompt (unless force or dry-run)

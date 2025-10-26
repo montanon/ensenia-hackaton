@@ -283,6 +283,7 @@ class ConnectionValidator:
 
         Returns:
             True if connection successful, False otherwise
+
         """
         msg = "\n" + "=" * 60
         logger.info(msg)

@@ -87,9 +87,15 @@ export async function handleValidate(
     })) as AiTextGenerationResponse;
 
     // Parse AI response and calculate scores
-    const validationDetails = parseValidationResponse(
+    let validationDetails = parseValidationResponse(
       aiResponse.response,
       expectedOA
+    );
+
+    validationDetails = applyOACoverageAdjustments(
+      validationDetails,
+      expectedOA,
+      ministryStandards
     );
 
     // Calculate overall score (weighted average)
@@ -119,6 +125,67 @@ export async function handleValidate(
       error.message || 'Validation operation failed'
     );
   }
+}
+
+/**
+ * Ensure OA coverage from Worker output and ministry metadata
+ */
+function applyOACoverageAdjustments(
+  details: ValidationDetails,
+  expectedOA: string[],
+  ministryStandards: any[]
+): ValidationDetails {
+  if (!expectedOA.length) {
+    return details;
+  }
+
+  const normalizedIssues = details.issues.map((issue) => issue.toLowerCase());
+  const normalizedRecommendations = details.recommendations.map((rec) =>
+    rec.toLowerCase()
+  );
+
+  const presentStandards = ministryStandards.map((standard) =>
+    String(standard.oa_code || '').toLowerCase()
+  );
+
+  const missingFromDb = expectedOA.filter(
+    (oa) => !presentStandards.includes(oa.toLowerCase())
+  );
+
+  const missingFromFeedback = expectedOA.filter(
+    (oa) =>
+      !normalizedIssues.some((issue) => issue.includes(oa.toLowerCase())) &&
+      !normalizedRecommendations.some((rec) =>
+        rec.includes(oa.toLowerCase())
+      )
+  );
+
+  const missingOAs = Array.from(
+    new Set([...missingFromDb, ...missingFromFeedback])
+  );
+
+  if (!missingOAs.length) {
+    return details;
+  }
+
+  const shouldPenalize = missingFromDb.length > 0;
+  const penaltySource = missingFromDb.length ? missingFromDb : missingOAs;
+  const penalty = shouldPenalize
+    ? Math.min(40, penaltySource.length * 10)
+    : 0;
+  const updatedScore = Math.max(
+    0,
+    details.oa_alignment_score - penalty
+  );
+
+  return {
+    ...details,
+    oa_alignment_score: updatedScore,
+    issues: [
+      `Los siguientes OA no fueron abordados explícitamente: ${missingOAs.join(', ')}`,
+      ...details.issues,
+    ],
+  };
 }
 
 /**

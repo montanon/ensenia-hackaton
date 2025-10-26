@@ -4,7 +4,9 @@ Endpoints for managing chat sessions, sending messages,
 and triggering research context updates.
 """
 
+import asyncio
 import logging
+from collections.abc import Callable
 from datetime import datetime
 from typing import Annotated, Any
 
@@ -15,14 +17,29 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from app.ensenia.database.models import Session as DBSession
-from app.ensenia.database.session import get_db
+from app.ensenia.database.session import AsyncSessionLocal, get_db
 from app.ensenia.models import ChatMode
 from app.ensenia.services.chat_service import get_chat_service
+from app.ensenia.services.content_generation_service import ContentGenerationService
+from app.ensenia.services.exercise_pool_service import (
+    get_exercise_pool_service,
+)
+from app.ensenia.services.exercise_repository import (
+    get_exercise_repository,
+)
+from app.ensenia.services.generation_service import (
+    get_generation_service,
+)
 from app.ensenia.services.research_service import get_research_service
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/chat", tags=["chat"])
+
+background_tasks: set[asyncio.Task] = set()
+
+# Constants
+INITIAL_EXERCISE_POOL_SIZE = 5
 
 
 # Request/Response Models
@@ -106,10 +123,139 @@ class SessionResponse(BaseModel):
     messages: list[MessageResponse]
 
 
+# Background task for session initialization
+async def initialize_session_background(
+    session_id: int,
+    grade: int,
+    subject: str,
+    topic: str | None,
+    db_session_maker: Callable[[], AsyncSession],
+) -> None:
+    """Background task to initialize session with research and exercises.
+
+    Args:
+        session_id: Session ID
+        grade: Grade level
+        subject: Subject area
+        topic: Optional topic for research
+        db_session_maker: Database session factory
+
+    """
+    try:
+        # Create a new database session for background task
+        async with db_session_maker() as db:
+            research_service = get_research_service()
+            generation_service = get_generation_service()
+            repository = get_exercise_repository()
+            pool_service = get_exercise_pool_service(generation_service, repository)
+
+            # Determine research topic
+            research_topic = topic or f"{subject} - {grade}° Básico"
+
+            # Step 1: Load research context
+            logger.info(
+                "[Background] Starting research for session %s on topic: %s",
+                session_id,
+                research_topic,
+            )
+            try:
+                context = await research_service.update_session_context(
+                    session_id, research_topic, db
+                )
+                logger.info(
+                    "[Background] Research completed for session %s", session_id
+                )
+            except Exception:
+                logger.exception(
+                    "[Background] Research failed for session %s", session_id
+                )
+                context = None
+
+            # Step 2: Generate initial exercise pool + content in parallel
+            logger.info(
+                "[Background] Generating exercises and content for session %s",
+                session_id,
+            )
+
+            try:
+                # Initialize content generation service
+                content_service = ContentGenerationService()
+
+                # Run exercises, learning content, and study guide in parallel
+                exercise_task = pool_service.generate_initial_pool(
+                    session_id=session_id,
+                    grade=grade,
+                    subject=subject,
+                    topic=research_topic,
+                    db=db,
+                    pool_size=INITIAL_EXERCISE_POOL_SIZE,
+                    curriculum_context=context,
+                )
+
+                # Only generate content if we have research context
+                if context:
+                    learning_content_task = content_service.generate_learning_content(
+                        subject=subject,
+                        grade=grade,
+                        curriculum_context=context,
+                        topic=topic,
+                    )
+
+                    study_guide_task = content_service.generate_study_guide(
+                        subject=subject,
+                        grade=grade,
+                        curriculum_context=context,
+                        topic=topic,
+                    )
+
+                    # Wait for all tasks in parallel
+                    exercise_ids, learning_content, study_guide = await asyncio.gather(
+                        exercise_task,
+                        learning_content_task,
+                        study_guide_task,
+                        return_exceptions=False,
+                    )
+                else:
+                    # If no research context, just generate exercises
+                    exercise_ids = await exercise_task
+                    learning_content = None
+                    study_guide = None
+
+                # Update session with generated content
+                stmt = select(DBSession).where(DBSession.id == session_id)
+                result = await db.execute(stmt)
+                session = result.scalar_one()
+
+                session.learning_content = learning_content
+                session.study_guide = study_guide
+                await db.commit()
+
+                logger.info(
+                    "[Background] Generated %d exercises and content for session %s",
+                    len(exercise_ids),
+                    session_id,
+                )
+
+            except Exception:
+                logger.exception(
+                    "[Background] Content/exercise generation failed for session %s",
+                    session_id,
+                )
+
+            logger.info("[Background] Session %s initialization complete", session_id)
+
+    except Exception:
+        logger.exception(
+            "[Background] Fatal error in session %s initialization", session_id
+        )
+        # Don't raise - background tasks should fail silently to avoid crashing
+
+
 # Endpoints
 @router.post("/sessions")
 async def create_session(
-    request: CreateSessionRequest, db: Annotated[AsyncSession, Depends(get_db)]
+    request: CreateSessionRequest,
+    db: Annotated[AsyncSession, Depends(get_db)],
 ) -> CreateSessionResponse:
     """Create a new chat session.
 
@@ -144,25 +290,28 @@ async def create_session(
             session.mode,
         )
 
-        # Get initial research context if topic provided
-        context_loaded = False
-        if request.topic:
-            research_service = get_research_service()
-            try:
-                await research_service.update_session_context(
-                    session.id, request.topic, db
-                )
-                context_loaded = True
-                logger.info("Loaded research context for session %s", session.id)
-            except Exception:
-                logger.exception("Error loading research context")
-
+        # Trigger background initialization (research + exercise generation)
+        # This runs asynchronously without blocking the response
+        task = asyncio.create_task(
+            initialize_session_background(
+                session_id=session.id,
+                grade=request.grade,
+                subject=request.subject,
+                topic=request.topic,
+                db_session_maker=AsyncSessionLocal,
+            )
+        )
+        background_tasks.add(task)
+        task.add_done_callback(background_tasks.discard)
+        logger.info(
+            "Session %s created, background initialization started", session.id
+        )
         return CreateSessionResponse(
             session_id=session.id,
             grade=session.grade,
             subject=session.subject,
             mode=session.mode,
-            context_loaded=context_loaded,
+            context_loaded=False,  # Background task handles this
             created_at=session.created_at,
         )
 
@@ -332,6 +481,157 @@ async def update_session_mode(
         raise HTTPException(status_code=404, detail=str(e)) from e
     except Exception as e:
         logger.exception("Error updating session mode")
+        raise HTTPException(status_code=500, detail=str(e)) from e
+
+
+@router.get("/sessions/{session_id}/status")
+async def get_session_status(
+    session_id: int,
+    db: Annotated[AsyncSession, Depends(get_db)],
+) -> dict[str, Any]:
+    """Get session initialization status.
+
+    Returns information about whether research context has loaded
+    and how many exercises are ready.
+
+    Args:
+        session_id: Session ID
+        db: Database session
+
+    Returns:
+        Session status including research and exercise pool status
+
+    Raises:
+        HTTPException: If session not found
+
+    """
+    try:
+        # Load session
+        stmt = select(DBSession).where(DBSession.id == session_id)
+        result = await db.execute(stmt)
+        session = result.scalar_one_or_none()
+
+        if not session:
+            raise HTTPException(status_code=404, detail="Session not found")
+
+        # Get exercise pool status
+        generation_service = get_generation_service()
+        repository = get_exercise_repository()
+        pool_service = get_exercise_pool_service(generation_service, repository)
+
+        pool_status = await pool_service.get_pool_status(session_id, db)
+
+        return {
+            "session_id": session_id,
+            "research_loaded": session.research_context is not None,
+            "initial_exercises_ready": (
+                pool_status["total_exercises"] >= INITIAL_EXERCISE_POOL_SIZE
+            ),
+            "exercise_count": pool_status["total_exercises"],
+            "pending_exercises": pool_status["pending_exercises"],
+            "pool_health": pool_status["pool_health"],
+            "learning_content_ready": session.learning_content is not None,
+            "study_guide_ready": session.study_guide is not None,
+        }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.exception("Error getting session status")
+        raise HTTPException(status_code=500, detail=str(e)) from e
+
+
+@router.get("/sessions/{session_id}/learning-content")
+async def get_learning_content(
+    session_id: int,
+    db: Annotated[AsyncSession, Depends(get_db)],
+) -> dict[str, Any]:
+    """Get structured learning content for a session.
+
+    Returns the generated learning materials from research context.
+
+    Args:
+        session_id: Session ID
+        db: Database session
+
+    Returns:
+        Learning content with sections, examples, and vocabulary
+
+    Raises:
+        HTTPException: If session not found or content not ready
+
+    """
+    try:
+        # Load session
+        stmt = select(DBSession).where(DBSession.id == session_id)
+        result = await db.execute(stmt)
+        session = result.scalar_one_or_none()
+
+        if not session:
+            raise HTTPException(status_code=404, detail="Session not found")
+
+        if session.learning_content is None:
+            raise HTTPException(
+                status_code=202,
+                detail="Learning content not yet generated. Please check back later.",
+            )
+
+        return {
+            "session_id": session_id,
+            "content": session.learning_content,
+        }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.exception("Error getting learning content")
+        raise HTTPException(status_code=500, detail=str(e)) from e
+
+
+@router.get("/sessions/{session_id}/study-guide")
+async def get_study_guide(
+    session_id: int,
+    db: Annotated[AsyncSession, Depends(get_db)],
+) -> dict[str, Any]:
+    """Get study guide for a session.
+
+    Returns the generated study guide with key concepts and review materials.
+
+    Args:
+        session_id: Session ID
+        db: Database session
+
+    Returns:
+        Study guide with concepts, summaries, common mistakes, and practice tips
+
+    Raises:
+        HTTPException: If session not found or guide not ready
+
+    """
+    try:
+        # Load session
+        stmt = select(DBSession).where(DBSession.id == session_id)
+        result = await db.execute(stmt)
+        session = result.scalar_one_or_none()
+
+        if not session:
+            raise HTTPException(status_code=404, detail="Session not found")
+
+        if session.study_guide is None:
+            raise HTTPException(
+                status_code=202,
+                detail="Study guide not yet generated. Please check back later.",
+            )
+
+        return {
+            "session_id": session_id,
+            "guide": session.study_guide,
+        }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.exception("Error getting study guide")
         raise HTTPException(status_code=500, detail=str(e)) from e
 
 

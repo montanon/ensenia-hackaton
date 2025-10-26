@@ -66,6 +66,7 @@ export function createMockEnv(overrides?: Partial<Env>): Env {
     CACHE_TTL_WARM: '86400',
     CACHE_TTL_COLD: '604800',
     DEBUG: 'true',
+    ADMIN_API_TOKEN: 'test-admin-token',
     ...overrides,
   };
 }

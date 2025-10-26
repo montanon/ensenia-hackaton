@@ -19,23 +19,34 @@ from app.ensenia.database.models import Base
 
 logger = logging.getLogger(__name__)
 
-# Create async engine
-engine: AsyncEngine = create_async_engine(
-    settings.database_url,
-    pool_size=settings.database_pool_size,
-    max_overflow=settings.database_max_overflow,
-    pool_pre_ping=True,  # Verify connections before using
-    echo=settings.debug,  # Log SQL statements in debug mode
-)
 
-# Create async session factory
-AsyncSessionLocal = async_sessionmaker(
-    engine,
-    class_=AsyncSession,
-    expire_on_commit=False,  # Prevent lazy loading issues
-    autocommit=False,
-    autoflush=False,
-)
+def _create_engine() -> AsyncEngine:
+    """Create a new async engine using current settings."""
+    return create_async_engine(
+        settings.database_url,
+        pool_size=settings.database_pool_size,
+        max_overflow=settings.database_max_overflow,
+        pool_pre_ping=True,
+        echo=settings.debug,
+    )
+
+
+def _create_session_factory(
+    bind_engine: AsyncEngine,
+) -> async_sessionmaker[AsyncSession]:
+    """Create a new async session factory bound to provided engine."""
+    return async_sessionmaker(
+        bind_engine,
+        class_=AsyncSession,
+        expire_on_commit=False,
+        autocommit=False,
+        autoflush=False,
+    )
+
+
+# Initialize engine and session factory
+engine: AsyncEngine = _create_engine()
+AsyncSessionLocal: async_sessionmaker[AsyncSession] = _create_session_factory(engine)
 
 
 async def get_db() -> AsyncGenerator[AsyncSession, None]:
@@ -81,3 +92,15 @@ async def close_db() -> None:
     logger.info("Closing database connections...")
     await engine.dispose()
     logger.info("Database connections closed")
+
+
+async def reset_engine() -> None:
+    """Dispose current engine and rebuild it with latest settings.
+
+    Useful for tests that override database configuration.
+    """
+    global engine, AsyncSessionLocal  # noqa: PLW0603
+    logger.info("Resetting database engine with updated settings...")
+    await engine.dispose()
+    engine = _create_engine()
+    AsyncSessionLocal = _create_session_factory(engine)

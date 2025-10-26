@@ -236,7 +236,7 @@ async def stream_audio_response(
         "speed": voice_settings.speed,
     }
 
-    audio_id = tts_service._generate_cache_key(
+    audio_id = tts_service._generate_cache_key(  # noqa: SLF001
         text_content,
         settings.elevenlabs_voice_id,
         settings.elevenlabs_model_id,

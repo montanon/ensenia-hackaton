@@ -10,7 +10,7 @@
     "install:python": "uv sync",
 
     "dev:worker": "cd app/worker && npm run dev",
-    "dev:python": "uv run uvicorn ensenia.main:app --reload",
+    "dev:python": "uv run uvicorn app.ensenia.main:app --reload",
     "dev:web": "cd app/web && npm run dev",
 
     "build:worker": "cd app/worker && npm run deploy",

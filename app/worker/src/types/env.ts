@@ -25,6 +25,7 @@ export interface Env {
   CACHE_TTL_WARM: string;
   CACHE_TTL_COLD: string;
   DEBUG?: string;
+  ADMIN_API_TOKEN?: string;
 }
 
 /**

@@ -1,13 +1,19 @@
 """Pytest configuration and fixtures."""
 
 import asyncio
+import logging
+import subprocess
 from collections.abc import AsyncGenerator
+from pathlib import Path
 from unittest.mock import MagicMock
 
 import pytest
+from sqlalchemy import create_engine, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.ensenia.database.session import close_db, init_db
+from app.ensenia.database.session import close_db, init_db, reset_engine
+
+logger = logging.getLogger(__name__)
 
 
 @pytest.fixture
@@ -46,15 +52,77 @@ async def reset_db_engine():
 
     This ensures the engine is not tied to a stale event loop.
     """
-    # Dispose before test to ensure clean state
-    from app.ensenia.database.session import engine
-
-    await engine.dispose()
+    await reset_engine()
 
     yield
 
-    # Dispose after test to clean up
-    await engine.dispose()
+    await reset_engine()
+
+
+@pytest.fixture(scope="session", autouse=True)
+def setup_test_db():
+    """Test database with migrations setup.
+
+    This fixture:
+    1. Applies all pending migrations to the test database
+    2. Verifies that critical schema columns exist
+    3. Fails early if migrations don't succeed
+
+    """
+    project_root = Path(__file__).parent.parent
+    venv_alembic = project_root / ".venv" / "bin" / "alembic"
+
+    # Apply migrations using subprocess with explicit venv alembic
+    result = subprocess.run(  # noqa: S603
+        [str(venv_alembic), "upgrade", "head"],
+        cwd=str(project_root),
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+
+    if result.returncode != 0:
+        msg = (
+            f"Database migrations failed. Cannot proceed with tests.\n"
+            f"stderr: {result.stderr}\nstdout: {result.stdout}"
+        )
+        logger.error(msg)
+        pytest.fail(msg)
+
+    # Verify critical schema columns exist using direct database connection
+    db_url = "postgresql+psycopg://ensenia:hackathon@localhost:5433/test"
+    engine = create_engine(db_url)
+
+    try:
+        with engine.begin() as conn:
+            # Check that critical columns exist on sessions table
+            result = conn.execute(
+                text("""
+                    SELECT column_name
+                    FROM information_schema.columns
+                    WHERE table_name = 'sessions'
+                """)
+            )
+            columns = {row[0] for row in result}
+
+            # Critical columns that should exist after latest migration
+            required_columns = {"learning_content", "study_guide"}
+            missing_columns = required_columns - columns
+
+            if missing_columns:
+                msg = (
+                    f"Database schema verification failed!\n"
+                    f"Missing columns: {missing_columns}\n"
+                    f"Available columns: {columns}"
+                )
+                pytest.fail(msg)
+
+        logger.info("Test database schema verified successfully")
+    except (OSError, RuntimeError) as e:
+        msg = f"Failed to verify test database schema: {e}"
+        pytest.fail(msg)
+    finally:
+        engine.dispose()
 
 
 @pytest.fixture
@@ -62,28 +130,54 @@ async def db_session() -> AsyncGenerator[AsyncSession, None]:
     """Provide a database session for tests.
 
     This creates a new session for each test to avoid event loop conflicts.
+    Assumes migrations have been applied by setup_test_db fixture.
     """
     # Import here to avoid circular dependency issues
-    # Ensure database is initialized
-    from app.ensenia.database.models import Base
     from app.ensenia.database.session import AsyncSessionLocal, engine
 
-    async with engine.begin() as conn:
-        await conn.run_sync(Base.metadata.create_all)
+    try:
+        # Create and yield session
+        async with AsyncSessionLocal() as session:
+            try:
+                yield session
+            finally:
+                # Always rollback to ensure test isolation
+                await session.rollback()
+                await session.close()
+    except Exception:
+        # If there's an error creating the session, still try to close the engine
+        await engine.dispose()
+        raise
 
-    # Create and yield session
-    async with AsyncSessionLocal() as session:
-        try:
-            yield session
-        finally:
-            # Always rollback to ensure test isolation
-            # Tests should not persist data between runs
-            await session.rollback()
-            await session.close()
+
+@pytest.fixture
+async def test_client(db_session):  # noqa: ARG001
+    """Create standardized async test client with database dependency.
+
+    This is the standard client fixture that should be used in all tests.
+    It ensures:
+    1. Database is initialized before client is created (via db_session dependency)
+    2. All tests use async/await consistently
+    3. Proper cleanup happens via db_session fixture rollback
+
+    Usage:
+        async def test_something(test_client):
+            response = await test_client.get("/endpoint")
+            assert response.status_code == 200
+    """
+    import httpx
+
+    from app.ensenia.main import app
+
+    transport = httpx.ASGITransport(app=app)
+    async with httpx.AsyncClient(
+        transport=transport, base_url="http://test", timeout=10.0
+    ) as client:
+        yield client
 
 
 @pytest.fixture(autouse=True)
-def mock_settings(monkeypatch):
+def mock_settings(monkeypatch):  # noqa: PLR0915
     """Mock settings for all tests to avoid requiring .env file."""
     mock_settings_obj = MagicMock()
     mock_settings_obj.cloudflare_account_id = "test-account-id"
@@ -124,7 +218,7 @@ def mock_settings(monkeypatch):
 
     # Database settings
     mock_settings_obj.database_url = (
-        "postgresql+asyncpg://test:test@localhost:5433/test"
+        "postgresql+asyncpg://ensenia:hackathon@localhost:5433/test"
     )
     mock_settings_obj.database_pool_size = 5
     mock_settings_obj.database_max_overflow = 10
@@ -153,7 +247,7 @@ def mock_settings(monkeypatch):
     mock_settings_obj.generation_quality_threshold = 8
     mock_settings_obj.generation_model = "gpt-4-turbo-preview"
     mock_settings_obj.database_url = (
-        "postgresql+asyncpg://test:test@localhost:5433/test"
+        "postgresql+asyncpg://ensenia:hackathon@localhost:5433/test"
     )
     mock_settings_obj.cloudflare_worker_url = "http://localhost:8787"
     mock_settings_obj.cache_dir = "./test_cache"

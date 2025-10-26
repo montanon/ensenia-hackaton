@@ -353,6 +353,22 @@ wheels = [
 ]
 
 [[package]]
+name = "deepgram-sdk"
+version = "5.2.0"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "httpx" },
+    { name = "pydantic" },
+    { name = "pydantic-core" },
+    { name = "typing-extensions" },
+    { name = "websockets" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/55/1f/eab4a75179e6ffdf0fa9fc60f5a9b6ece1de8eb41c98d1f44ae5264f242d/deepgram_sdk-5.2.0.tar.gz", hash = "sha256:14941667d68454fc66c3a0c109ca58d2f0eb626697e509946f84851966b61a77", size = 146909, upload-time = "2025-10-21T20:43:27.262Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/98/f6/4f737f161ea4ce97af8c6f84e813183066831a7303b8b5b0a93852a45295/deepgram_sdk-5.2.0-py3-none-any.whl", hash = "sha256:077e81fafff1b9e954f792ee71c46381504f9c7805fb54d4a4e2ccbc752dfc93", size = 385989, upload-time = "2025-10-21T20:43:25.961Z" },
+]
+
+[[package]]
 name = "distro"
 version = "1.9.0"
 source = { registry = "https://pypi.org/simple" }
@@ -387,6 +403,7 @@ dependencies = [
     { name = "alembic" },
     { name = "asyncpg" },
     { name = "boto3" },
+    { name = "deepgram-sdk" },
     { name = "elevenlabs" },
     { name = "fastapi" },
     { name = "httpx" },
@@ -423,6 +440,7 @@ requires-dist = [
     { name = "alembic", specifier = ">=1.13.0" },
     { name = "asyncpg", specifier = ">=0.29.0" },
     { name = "boto3", specifier = ">=1.35.0" },
+    { name = "deepgram-sdk", specifier = ">=5.2.0" },
     { name = "elevenlabs", specifier = ">=1.0.0" },
     { name = "fastapi", specifier = ">=0.115.0" },
     { name = "httpx", specifier = ">=0.27.0" },
