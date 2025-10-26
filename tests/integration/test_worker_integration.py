@@ -109,7 +109,7 @@ class TestWorkerIntegration:
             service = get_research_service()
 
             # Should raise validation error
-            with pytest.raises(Exception, match=".*"):
+            with pytest.raises(Exception, match=r".*"):
                 await service.search_curriculum(
                     query="test", grade=5, subject="matemáticas"
                 )
