@@ -104,6 +104,13 @@ ignore = [
     "ARG002",    # Unused method argument (test fixtures often unused)
     "E501",      # Line too long (test strings can be verbose)
 ]
+"alembic/versions/*.py" = [
+    "INP001",    # Implicit namespace package (alembic auto-generated)
+    "D103",      # Missing docstring in public function (alembic auto-generated)
+    "D400",      # First line should end with period (alembic docstrings)
+    "D415",      # First line should end with punctuation (alembic docstrings)
+    "UP035",     # Import from collections.abc (alembic imports)
+]
 "app/ensenia/services/exercise_repository.py" = ["PLR0913"]  # Repository methods need many params
 "app/ensenia/services/generation_service.py" = ["E501"]  # Long prompts are more readable
 
