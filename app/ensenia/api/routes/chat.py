@@ -16,6 +16,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
+from app.ensenia.database.models import InputMode, OutputMode
 from app.ensenia.database.models import Session as DBSession
 from app.ensenia.database.session import AsyncSessionLocal, get_db
 from app.ensenia.models import ChatMode
@@ -46,6 +47,16 @@ class CreateSessionRequest(BaseModel):
     grade: int = Field(..., ge=1, le=12, description="Grade level (1-12)")
     subject: str = Field(..., min_length=1, description="Subject area")
     mode: ChatMode = Field(..., description="Chat mode")
+    input_mode: str = Field(
+        default=InputMode.TEXT.value,
+        description="Input mode: 'text' or 'voice'",
+        pattern="^(text|voice)$",
+    )
+    output_mode: str = Field(
+        default=OutputMode.TEXT.value,
+        description="Output mode: 'text' or 'audio'",
+        pattern="^(text|audio)$",
+    )
     topic: str | None = Field(None, description="Optional topic for initial research")
 
 
@@ -56,6 +67,8 @@ class CreateSessionResponse(BaseModel):
     grade: int
     subject: str
     mode: str
+    input_mode: str
+    output_mode: str
     context_loaded: bool
     created_at: datetime
 
@@ -85,18 +98,48 @@ class ResearchResponse(BaseModel):
 
 
 class UpdateModeRequest(BaseModel):
-    """Request to update session mode."""
+    """Request to update session output mode (backward compatibility)."""
 
     mode: str = Field(
-        ..., description="New mode: 'text' or 'audio'", pattern="^(text|audio)$"
+        ..., description="New output mode: 'text' or 'audio'", pattern="^(text|audio)$"
     )
 
 
 class UpdateModeResponse(BaseModel):
-    """Response after updating mode."""
+    """Response after updating output mode."""
 
     session_id: int
     mode: str
+
+
+class UpdateOutputModeRequest(BaseModel):
+    """Request to update session output mode."""
+
+    mode: str = Field(
+        ..., description="New output mode: 'text' or 'audio'", pattern="^(text|audio)$"
+    )
+
+
+class UpdateOutputModeResponse(BaseModel):
+    """Response after updating output mode."""
+
+    session_id: int
+    output_mode: str
+
+
+class UpdateInputModeRequest(BaseModel):
+    """Request to update session input mode."""
+
+    mode: str = Field(
+        ..., description="New input mode: 'text' or 'voice'", pattern="^(text|voice)$"
+    )
+
+
+class UpdateInputModeResponse(BaseModel):
+    """Response after updating input mode."""
+
+    session_id: int
+    input_mode: str
 
 
 class MessageResponse(BaseModel):
@@ -115,6 +158,8 @@ class SessionResponse(BaseModel):
     grade: int
     subject: str
     mode: str
+    input_mode: str
+    output_mode: str
     created_at: datetime
     research_context: str | None
     messages: list[MessageResponse]
@@ -255,11 +300,13 @@ async def create_session(
 
     """
     try:
-        # Create session
+        # Create session with input/output modes
         session = DBSession(
             grade=request.grade,
             subject=request.subject,
             mode=request.mode.value,  # Convert enum to string
+            input_mode=request.input_mode,
+            current_mode=request.output_mode,
             research_context=None,
         )
 
@@ -268,11 +315,13 @@ async def create_session(
         await db.refresh(session)
 
         logger.info(
-            "Created session %s (grade=%s, subject=%s, mode=%s)",
+            "Created session %s (grade=%s, subject=%s, mode=%s, input=%s, output=%s)",
             session.id,
             session.grade,
             session.subject,
             session.mode,
+            session.input_mode,
+            session.current_mode,
         )
 
         # Trigger background initialization (research + exercise generation)
@@ -295,6 +344,8 @@ async def create_session(
             grade=session.grade,
             subject=session.subject,
             mode=session.mode,
+            input_mode=session.input_mode,
+            output_mode=session.current_mode,
             context_loaded=False,  # Background task handles this
             created_at=session.created_at,
         )
@@ -420,6 +471,8 @@ async def get_session(
             grade=session.grade,
             subject=session.subject,
             mode=session.mode,
+            input_mode=session.input_mode,
+            output_mode=session.current_mode,
             created_at=session.created_at,
             research_context=session.research_context,
             messages=messages,
@@ -465,6 +518,78 @@ async def update_session_mode(
         raise HTTPException(status_code=404, detail=str(e)) from e
     except Exception as e:
         logger.exception("Error updating session mode")
+        raise HTTPException(status_code=500, detail=str(e)) from e
+
+
+@router.patch("/sessions/{session_id}/output-mode")
+async def update_session_output_mode(
+    session_id: int,
+    request: UpdateOutputModeRequest,
+    db: Annotated[AsyncSession, Depends(get_db)],
+) -> UpdateOutputModeResponse:
+    """Update session's output mode (text/audio).
+
+    Controls how the agent responds to the user.
+
+    Args:
+        session_id: Session ID
+        request: Output mode update request
+        db: Database session
+
+    Returns:
+        Updated session output mode
+
+    Raises:
+        HTTPException: If session not found or invalid mode
+
+    """
+    try:
+        chat_service = get_chat_service()
+
+        await chat_service.update_session_output_mode(session_id, request.mode, db)
+
+        return UpdateOutputModeResponse(session_id=session_id, output_mode=request.mode)
+
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e)) from e
+    except Exception as e:
+        logger.exception("Error updating session output mode")
+        raise HTTPException(status_code=500, detail=str(e)) from e
+
+
+@router.patch("/sessions/{session_id}/input-mode")
+async def update_session_input_mode(
+    session_id: int,
+    request: UpdateInputModeRequest,
+    db: Annotated[AsyncSession, Depends(get_db)],
+) -> UpdateInputModeResponse:
+    """Update session's input mode (text/voice).
+
+    Controls how the user sends messages to the agent.
+
+    Args:
+        session_id: Session ID
+        request: Input mode update request
+        db: Database session
+
+    Returns:
+        Updated session input mode
+
+    Raises:
+        HTTPException: If session not found or invalid mode
+
+    """
+    try:
+        chat_service = get_chat_service()
+
+        await chat_service.update_session_input_mode(session_id, request.mode, db)
+
+        return UpdateInputModeResponse(session_id=session_id, input_mode=request.mode)
+
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e)) from e
+    except Exception as e:
+        logger.exception("Error updating session input mode")
         raise HTTPException(status_code=500, detail=str(e)) from e
 
 
