@@ -6,9 +6,9 @@ import { useAudioStore } from '../../stores/audioStore';
 import { websocketService } from '../../services/websocket';
 import { API_URL } from '../../utils/constants';
 import { MessageList } from '../chat/MessageList';
-import { ChatInput } from '../chat/ChatInput';
 import { TypingIndicator } from './TypingIndicator';
 import { SoundWaveVisualization } from './SoundWaveVisualization';
+import { BubbleChatInput } from './BubbleChatInput';
 import { cn } from '../../utils/helpers';
 import './bubble-chat-window.css';
 
@@ -16,19 +16,17 @@ export const BubbleChatWindow: React.FC = () => {
   const { isChatOpen, closeChat } = useBubbleStore();
   const { currentSession, outputMode } = useSessionStore();
   const {
-    addMessage,
     appendStreamChunk,
     completeStream,
-    startStreaming,
     isStreaming,
   } = useChatStore();
   const { setCurrentAudio, setSpeaking, setPlaying, isSpeaking } = useAudioStore();
   const [isConnected, setIsConnected] = useState(false);
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const resizeRef = useRef<HTMLDivElement>(null);
-  const [windowSize, setWindowSize] = useState({ width: 384, height: 500 });
+  const [panelWidth, setPanelWidth] = useState(384);
   const [isResizing, setIsResizing] = useState(false);
-  const resizeStartRef = useRef({ x: 0, y: 0, width: 0, height: 0 });
+  const resizeStartRef = useRef({ x: 0, width: 0 });
 
   useEffect(() => {
     if (!currentSession || !isChatOpen) return;
@@ -114,28 +112,13 @@ export const BubbleChatWindow: React.FC = () => {
     }
   }, [outputMode, isConnected, currentSession]);
 
-  const handleSendMessage = (message: string) => {
-    if (!currentSession || !isConnected) return;
-
-    addMessage({
-      role: 'user',
-      content: message,
-      timestamp: new Date().toISOString(),
-    });
-
-    startStreaming();
-    websocketService.sendMessage(message);
-  };
-
-  // Handle resize from top-left corner
+  // Handle resize from left edge
   const handleResizeStart = (e: React.MouseEvent) => {
     e.preventDefault();
     setIsResizing(true);
     resizeStartRef.current = {
       x: e.clientX,
-      y: e.clientY,
-      width: windowSize.width,
-      height: windowSize.height,
+      width: panelWidth,
     };
   };
 
@@ -144,12 +127,8 @@ export const BubbleChatWindow: React.FC = () => {
 
     const handleResizeMove = (e: MouseEvent) => {
       const deltaX = resizeStartRef.current.x - e.clientX;
-      const deltaY = resizeStartRef.current.y - e.clientY;
-
-      const newWidth = Math.max(320, Math.min(600, resizeStartRef.current.width + deltaX));
-      const newHeight = Math.max(400, Math.min(700, resizeStartRef.current.height + deltaY));
-
-      setWindowSize({ width: newWidth, height: newHeight });
+      const newWidth = Math.max(320, Math.min(800, resizeStartRef.current.width + deltaX));
+      setPanelWidth(newWidth);
     };
 
     const handleResizeEnd = () => {
@@ -165,36 +144,27 @@ export const BubbleChatWindow: React.FC = () => {
     };
   }, [isResizing]);
 
-  if (!isChatOpen) return null;
-
   return (
     <div
       ref={resizeRef}
       className={cn(
-        'fixed bottom-24 right-12 z-40',
-        'bubble-chat-window resize overflow-auto',
-        isChatOpen ? 'bubble-chat-window-open' : ''
+        'h-screen z-40 flex-shrink-0',
+        isChatOpen ? 'bubble-chat-panel-open' : 'bubble-chat-panel'
       )}
       style={{
-        width: `${windowSize.width}px`,
-        height: `${windowSize.height}px`,
-        minWidth: '320px',
-        maxWidth: '600px',
-        minHeight: '400px',
-        maxHeight: '700px',
+        width: isChatOpen ? `${panelWidth}px` : '0px',
       }}
     >
-      <div className="h-full bg-white rounded-2xl shadow-[0_20px_60px_-15px_rgba(59,130,246,0.5)] border border-blue-100 flex flex-col overflow-hidden backdrop-blur-sm relative">
-        {/* Resize Handle - Top Left */}
+      <div
+        className="h-full bg-white shadow-[-20px_0_60px_-15px_rgba(59,130,246,0.5)] border-l border-blue-100 flex flex-col overflow-hidden backdrop-blur-sm relative"
+        style={{ width: `${panelWidth}px` }}
+      >
+        {/* Resize Handle - Left Edge */}
         <div
           onMouseDown={handleResizeStart}
-          className="absolute top-0 left-0 w-8 h-8 cursor-nwse-resize z-50 group"
+          className="absolute top-0 left-0 w-2 h-full cursor-ew-resize z-50 group hover:bg-blue-500/10 transition-colors"
         >
-          <div className="absolute top-2 left-2 w-4 h-4 flex flex-col gap-0.5 items-start pointer-events-none">
-            <div className="w-3 h-0.5 bg-white/40 group-hover:bg-white/60 rounded-full transition-colors" />
-            <div className="w-2 h-0.5 bg-white/40 group-hover:bg-white/60 rounded-full transition-colors" />
-            <div className="w-1 h-0.5 bg-white/40 group-hover:bg-white/60 rounded-full transition-colors" />
-          </div>
+          <div className="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-12 bg-blue-300/50 group-hover:bg-blue-500 rounded-r-full transition-colors" />
         </div>
 
         {/* Header */}
@@ -225,24 +195,21 @@ export const BubbleChatWindow: React.FC = () => {
           </div>
         )}
 
-        {/* No Session State */}
-        {!currentSession && (
-          <div className="flex-1 flex items-center justify-center p-6">
-            <div className="text-center">
-              <div className="w-16 h-16 mx-auto mb-4 bg-blue-100 rounded-full flex items-center justify-center animate-pulse">
-                <div className="w-8 h-8 bg-blue-500 rounded-full animate-ping-slow" />
+        {/* Messages Area */}
+        <div className="flex-1 overflow-auto bg-gradient-to-b from-gray-50 to-white p-4">
+          {!currentSession ? (
+            <div className="h-full flex items-center justify-center">
+              <div className="text-center">
+                <div className="w-16 h-16 mx-auto mb-4 bg-blue-100 rounded-full flex items-center justify-center animate-pulse">
+                  <div className="w-8 h-8 bg-blue-500 rounded-full animate-ping-slow" />
+                </div>
+                <p className="text-gray-600 text-sm">
+                  Crea una sesión para comenzar
+                </p>
               </div>
-              <p className="text-gray-600 text-sm">
-                Crea una sesión para comenzar
-              </p>
             </div>
-          </div>
-        )}
-
-        {/* Messages */}
-        {currentSession && (
-          <>
-            <div className="flex-1 overflow-hidden bg-gradient-to-b from-gray-50 to-white">
+          ) : (
+            <>
               <MessageList />
 
               {/* Typing Indicator */}
@@ -251,17 +218,12 @@ export const BubbleChatWindow: React.FC = () => {
                   <TypingIndicator />
                 </div>
               )}
-            </div>
+            </>
+          )}
+        </div>
 
-            {/* Input */}
-            <div className="border-t border-blue-100 bg-white">
-              <ChatInput
-                onSendMessage={handleSendMessage}
-                disabled={!isConnected}
-              />
-            </div>
-          </>
-        )}
+        {/* Chat Input */}
+        <BubbleChatInput />
       </div>
     </div>
   );
