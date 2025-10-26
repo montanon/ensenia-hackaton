@@ -5,7 +5,7 @@ external API calls (OpenAI, ElevenLabs).
 """
 
 from datetime import UTC, datetime
-from unittest.mock import AsyncMock
+from unittest.mock import AsyncMock, Mock
 
 import pytest
 from fastapi import WebSocket
@@ -252,19 +252,26 @@ class TestChatServiceEnhancements:
     async def test_update_session_mode_validation(self):
         """Test mode update validates input."""
         mock_db = AsyncMock(spec=AsyncSession)
-        service = ChatService(db=mock_db)
+        service = ChatService()
 
         # Invalid mode should raise ValueError
         with pytest.raises(ValueError, match="Invalid mode"):
-            await service.update_session_mode(1, "invalid_mode")
+            await service.update_session_mode(1, "invalid_mode", mock_db)
 
     @pytest.mark.asyncio
     async def test_get_session_requires_db(self):
-        """Test get_session requires database session."""
-        service = ChatService()  # No db provided
+        """Test get_session requires database session parameter."""
+        service = ChatService()
+        mock_db = AsyncMock(spec=AsyncSession)
 
-        with pytest.raises(ValueError, match="Database session not provided"):
-            await service.get_session(1)
+        # Mock the database to return None (session not found)
+        mock_result = AsyncMock()
+        mock_result.scalar_one_or_none = Mock(return_value=None)
+        mock_db.execute = AsyncMock(return_value=mock_result)
+
+        # Should return None when session not found
+        result = await service.get_session(1, mock_db)
+        assert result is None
 
 
 class TestStreamOrchestrator:
