@@ -9,8 +9,9 @@ import type {
   GenerateExerciseRequest,
   Exercise,
   SubmitAnswerRequest,
+  GenerateExerciseResponse,
 } from '../types/exercise';
-import type { SendMessageRequest, Message } from '../types/message';
+import type { SendMessageRequest, SendMessageResponse } from '../types/message';
 
 const api = axios.create({
   baseURL: API_URL,
@@ -31,8 +32,8 @@ export const sessionApi = {
     return response.data;
   },
 
-  sendMessage: async (sessionId: number, data: SendMessageRequest): Promise<Message> => {
-    const response = await api.post<Message>(`/chat/sessions/${sessionId}/messages`, data);
+  sendMessage: async (sessionId: number, data: SendMessageRequest): Promise<SendMessageResponse> => {
+    const response = await api.post<SendMessageResponse>(`/chat/sessions/${sessionId}/messages`, data);
     return response.data;
   },
 
@@ -47,8 +48,8 @@ export const sessionApi = {
 
 // Exercise API
 export const exerciseApi = {
-  generate: async (data: GenerateExerciseRequest): Promise<Exercise> => {
-    const response = await api.post<Exercise>('/exercises/generate', data);
+  generate: async (data: GenerateExerciseRequest): Promise<GenerateExerciseResponse> => {
+    const response = await api.post<GenerateExerciseResponse>('/exercises/generate', data);
     return response.data;
   },
 

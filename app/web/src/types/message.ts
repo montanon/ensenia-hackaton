@@ -15,3 +15,7 @@ export interface Message {
 export interface SendMessageRequest {
   message: string;
 }
+
+export interface SendMessageResponse {
+  response: string;
+}

@@ -34,13 +34,20 @@ export const ChatTab: React.FC = () => {
 
     setGenerating(true);
     try {
-      const exercise = await exerciseApi.generate({
+      const response = await exerciseApi.generate({
         exercise_type: 'multiple_choice',
         grade: currentSession.grade,
         subject: currentSession.subject,
         topic: 'Tema actual',
         difficulty_level: 3,
       });
+
+      // Extract exercise from wrapped response
+      const exercise = response.exercise;
+
+      // Log validation info (optional)
+      console.log('[Exercise] Validated with score:', response.validation_history);
+      console.log('[Exercise] Iterations used:', response.iterations_used);
 
       // Assign to session
       if (exercise.id && currentSession.id) {

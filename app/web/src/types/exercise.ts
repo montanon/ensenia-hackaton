@@ -64,3 +64,15 @@ export interface GenerateExerciseRequest {
 export interface SubmitAnswerRequest {
   answer: string;
 }
+
+export interface ValidationResult {
+  score: number;
+  feedback: string;
+  issues: string[];
+}
+
+export interface GenerateExerciseResponse {
+  exercise: Exercise;
+  validation_history: ValidationResult[];
+  iterations_used: number;
+}
