@@ -125,15 +125,39 @@ class ConnectionManager:
 
         await self.send_message(session_id, message)
 
-    async def send_mode_changed(self, session_id: int, mode: str) -> None:
+    async def send_output_mode_changed(self, session_id: int, mode: str) -> None:
         """Notify client that output mode has changed.
+
+        Args:
+            session_id: The session to send to
+            mode: The new output mode ('text' or 'audio')
+
+        """
+        await self.send_message(
+            session_id, {"type": "output_mode_changed", "mode": mode}
+        )
+
+    async def send_mode_changed(self, session_id: int, mode: str) -> None:
+        """Notify client that output mode has changed (backward compatibility).
 
         Args:
             session_id: The session to send to
             mode: The new mode ('text' or 'audio')
 
         """
-        await self.send_message(session_id, {"type": "mode_changed", "mode": mode})
+        await self.send_output_mode_changed(session_id, mode)
+
+    async def send_input_mode_changed(self, session_id: int, mode: str) -> None:
+        """Notify client that input mode has changed.
+
+        Args:
+            session_id: The session to send to
+            mode: The new input mode ('text' or 'voice')
+
+        """
+        await self.send_message(
+            session_id, {"type": "input_mode_changed", "mode": mode}
+        )
 
     async def send_error(
         self, session_id: int, error_message: str, error_code: str | None = None

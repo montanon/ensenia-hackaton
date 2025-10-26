@@ -34,6 +34,13 @@ class OutputMode(str, Enum):
     AUDIO = "audio"
 
 
+class InputMode(str, Enum):
+    """Enum for message input modes."""
+
+    TEXT = "text"
+    VOICE = "voice"
+
+
 class Base(DeclarativeBase):
     """Base class for all database models."""
 
@@ -68,6 +75,12 @@ class Session(Base):
     )  # Study guide with key concepts and review materials
 
     # WebSocket and audio mode support
+    input_mode: Mapped[str] = mapped_column(
+        String(10),
+        nullable=False,
+        default=InputMode.TEXT.value,
+        server_default=InputMode.TEXT.value,
+    )  # text or voice - how user sends messages (text input vs voice input)
     current_mode: Mapped[str] = mapped_column(
         String(10),
         nullable=False,
@@ -113,6 +126,13 @@ class Message(Base):
         index=True,
     )
 
+    # Input/Output mode tracking
+    input_mode: Mapped[str] = mapped_column(
+        String(10),
+        nullable=False,
+        default=InputMode.TEXT.value,
+        server_default=InputMode.TEXT.value,
+    )  # How user sent this message: text or voice
     # Audio support fields
     output_mode: Mapped[str] = mapped_column(
         String(10),

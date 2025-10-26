@@ -13,8 +13,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from app.ensenia.core.config import settings
+from app.ensenia.database.models import InputMode, OutputMode
 from app.ensenia.database.models import Message as DBMessage
-from app.ensenia.database.models import OutputMode
 from app.ensenia.database.models import Session as DBSession
 from app.ensenia.models import ChatMode
 
@@ -328,6 +328,24 @@ class ChatService:
     ) -> None:
         """Update a session's current output mode (text/audio).
 
+        Alias for update_session_output_mode for backward compatibility.
+
+        Args:
+            session_id: The session ID to update
+            new_mode: The new mode ('text' or 'audio')
+            db: Database session
+
+        Raises:
+            ValueError: If session not found or invalid mode
+
+        """
+        await self.update_session_output_mode(session_id, new_mode, db)
+
+    async def update_session_output_mode(
+        self, session_id: int, new_mode: str, db: AsyncSession
+    ) -> None:
+        """Update a session's current output mode (text/audio).
+
         Args:
             session_id: The session ID to update
             new_mode: The new mode ('text' or 'audio')
@@ -339,7 +357,7 @@ class ChatService:
         """
         # Validate mode using enum
         if new_mode not in [OutputMode.TEXT.value, OutputMode.AUDIO.value]:
-            msg = f"Invalid mode: {new_mode}. Must be 'text' or 'audio'"
+            msg = f"Invalid output mode: {new_mode}. Must be 'text' or 'audio'"
             raise ValueError(msg)
 
         stmt = select(DBSession).where(DBSession.id == session_id)
@@ -354,7 +372,45 @@ class ChatService:
 
         try:
             await db.commit()
-            msg = f"Session {session_id} mode updated to {new_mode}"
+            msg = f"Session {session_id} output mode updated to {new_mode}"
+            logger.info(msg)
+        except Exception:
+            await db.rollback()
+            logger.exception(msg)
+            raise
+
+    async def update_session_input_mode(
+        self, session_id: int, new_mode: str, db: AsyncSession
+    ) -> None:
+        """Update a session's input mode (text/voice).
+
+        Args:
+            session_id: The session ID to update
+            new_mode: The new mode ('text' or 'voice')
+            db: Database session
+
+        Raises:
+            ValueError: If session not found or invalid mode
+
+        """
+        # Validate mode using enum
+        if new_mode not in [InputMode.TEXT.value, InputMode.VOICE.value]:
+            msg = f"Invalid input mode: {new_mode}. Must be 'text' or 'voice'"
+            raise ValueError(msg)
+
+        stmt = select(DBSession).where(DBSession.id == session_id)
+        result = await db.execute(stmt)
+        session = result.scalar_one_or_none()
+
+        if not session:
+            msg = f"Session {session_id} not found"
+            raise ValueError(msg)
+
+        session.input_mode = new_mode
+
+        try:
+            await db.commit()
+            msg = f"Session {session_id} input mode updated to {new_mode}"
             logger.info(msg)
         except Exception:
             await db.rollback()
