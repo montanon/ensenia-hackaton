@@ -7,6 +7,21 @@ import httpx
 from app.ensenia.core.config import settings
 
 
+def _get_timeout_config() -> httpx.Timeout:
+    """Get timeout configuration for Workers AI requests.
+
+    Returns:
+        httpx.Timeout with granular timeout settings
+
+    """
+    return httpx.Timeout(
+        connect=settings.workers_ai_timeout_connect,
+        read=settings.workers_ai_timeout_read,
+        write=settings.workers_ai_timeout_write,
+        pool=settings.workers_ai_timeout_pool,
+    )
+
+
 class WorkersAIService:
     """Service wrapper for Cloudflare Workers AI operations."""
 
@@ -47,7 +62,7 @@ class WorkersAIService:
 
         payload = {"text": text}
 
-        async with httpx.AsyncClient(timeout=30.0) as client:
+        async with httpx.AsyncClient(timeout=_get_timeout_config()) as client:
             response = await client.post(url, headers=self._get_headers(), json=payload)
             response.raise_for_status()
 
@@ -107,7 +122,7 @@ class WorkersAIService:
         """
         url = f"{self.base_url}/{model}"
 
-        async with httpx.AsyncClient(timeout=60.0) as client:
+        async with httpx.AsyncClient(timeout=_get_timeout_config()) as client:
             response = await client.post(url, headers=self._get_headers(), json=inputs)
             response.raise_for_status()
 
