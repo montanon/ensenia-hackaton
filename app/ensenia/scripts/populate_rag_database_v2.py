@@ -132,10 +132,12 @@ class RAGDatabasePopulator:
         }
 
         # Process each subject folder
-        for subject_dir in subject_dirs:
+        total_subjects = len(subject_dirs)
+        for idx, subject_dir in enumerate(subject_dirs, 1):
             subject_name = subject_dir.name
+            progress_pct = (idx / total_subjects) * 100
             logger.info(f"\n{'=' * 60}")
-            logger.info(f"Processing Subject: {subject_name} (Grade {grade})")
+            logger.info(f"[{idx}/{total_subjects}] ({progress_pct:.1f}%) Processing Subject: {subject_name} (Grade {grade})")
             logger.info(f"{'=' * 60}")
 
             # Find subject-specific PDFs
@@ -210,9 +212,11 @@ class RAGDatabasePopulator:
             "errors": [],
         }
 
-        for pdf_path in pdfs:
+        total_pdfs = len(pdfs)
+        for pdf_idx, pdf_path in enumerate(pdfs, 1):
             try:
-                logger.info(f"  Processing: {pdf_path.name}")
+                pdf_progress = (pdf_idx / total_pdfs) * 100
+                logger.info(f"  [{pdf_idx}/{total_pdfs}] ({pdf_progress:.1f}%) Processing: {pdf_path.name}")
 
                 # Extract text from PDF
                 document = await self.pdf_processor.extract_text(pdf_path)
@@ -309,9 +313,11 @@ class RAGDatabasePopulator:
             "errors": [],
         }
 
-        for content in content_items:
+        total_items = len(content_items)
+        for idx, content in enumerate(content_items, 1):
             try:
-                logger.info(f"Processing existing content: {content.id}")
+                progress_pct = (idx / total_items) * 100
+                logger.info(f"[{idx}/{total_items}] ({progress_pct:.1f}%) Processing existing content: {content.id}")
 
                 embedding_result = (
                     await self.embedding_service.process_curriculum_content(content.id)
