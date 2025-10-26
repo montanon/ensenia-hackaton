@@ -38,6 +38,9 @@ router = APIRouter(prefix="/chat", tags=["chat"])
 
 background_tasks: set[asyncio.Task] = set()
 
+# Constants
+INITIAL_EXERCISE_POOL_SIZE = 5
+
 
 # Request/Response Models
 class CreateSessionRequest(BaseModel):
@@ -150,22 +153,29 @@ async def initialize_session_background(
             research_topic = topic or f"{subject} - {grade}° Básico"
 
             # Step 1: Load research context
-            msg = f"[Background] Starting research for session {session_id} on topic: {research_topic}"
-            logger.info(msg)
+            logger.info(
+                "[Background] Starting research for session %s on topic: %s",
+                session_id,
+                research_topic,
+            )
             try:
                 context = await research_service.update_session_context(
                     session_id, research_topic, db
                 )
-                msg = f"[Background] Research completed for session {session_id}"
-                logger.info(msg)
+                logger.info(
+                    "[Background] Research completed for session %s", session_id
+                )
             except Exception:
-                msg = f"[Background] Research failed for session {session_id}"
-                logger.exception(msg)
+                logger.exception(
+                    "[Background] Research failed for session %s", session_id
+                )
                 context = None
 
             # Step 2: Generate initial exercise pool + content in parallel
-            msg = f"[Background] Generating exercises and content for session {session_id}"
-            logger.info(msg)
+            logger.info(
+                "[Background] Generating exercises and content for session %s",
+                session_id,
+            )
 
             try:
                 # Initialize content generation service
@@ -178,7 +188,7 @@ async def initialize_session_background(
                     subject=subject,
                     topic=research_topic,
                     db=db,
-                    pool_size=5,
+                    pool_size=INITIAL_EXERCISE_POOL_SIZE,
                     curriculum_context=context,
                 )
 
@@ -220,19 +230,24 @@ async def initialize_session_background(
                 session.study_guide = study_guide
                 await db.commit()
 
-                msg = f"[Background] Generated {len(exercise_ids)} exercises and content for session {session_id}"
-                logger.info(msg)
+                logger.info(
+                    "[Background] Generated %d exercises and content for session %s",
+                    len(exercise_ids),
+                    session_id,
+                )
 
             except Exception:
-                msg = f"[Background] Content/exercise generation failed for session {session_id}"
-                logger.exception(msg)
+                logger.exception(
+                    "[Background] Content/exercise generation failed for session %s",
+                    session_id,
+                )
 
-            msg = f"[Background] Session {session_id} initialization complete"
-            logger.info(msg)
+            logger.info("[Background] Session %s initialization complete", session_id)
 
     except Exception:
-        msg = f"[Background] Fatal error in session {session_id} initialization"
-        logger.exception(msg)
+        logger.exception(
+            "[Background] Fatal error in session %s initialization", session_id
+        )
         # Don't raise - background tasks should fail silently to avoid crashing
 
 
@@ -288,8 +303,9 @@ async def create_session(
         )
         background_tasks.add(task)
         task.add_done_callback(background_tasks.discard)
-        msg = f"Session {session.id} created, background initialization started"
-        logger.info(msg)
+        logger.info(
+            "Session %s created, background initialization started", session.id
+        )
         return CreateSessionResponse(
             session_id=session.id,
             grade=session.grade,
@@ -508,7 +524,9 @@ async def get_session_status(
         return {
             "session_id": session_id,
             "research_loaded": session.research_context is not None,
-            "initial_exercises_ready": pool_status["total_exercises"] >= 5,
+            "initial_exercises_ready": (
+                pool_status["total_exercises"] >= INITIAL_EXERCISE_POOL_SIZE
+            ),
             "exercise_count": pool_status["total_exercises"],
             "pending_exercises": pool_status["pending_exercises"],
             "pool_health": pool_status["pool_health"],

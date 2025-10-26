@@ -50,6 +50,9 @@ router = APIRouter(prefix="/exercises", tags=["exercises"])
 
 background_tasks: set[asyncio.Task] = set()
 
+# Constants
+QUALITY_THRESHOLD = 8
+
 
 # ============================================================================
 # Helper Functions
@@ -147,10 +150,15 @@ async def generate_exercise(
         )
 
         # Reuse existing exercise if it meets quality threshold
-        if existing_exercises and existing_exercises[0].validation_score >= 8:
+        if existing_exercises and (
+            existing_exercises[0].validation_score >= QUALITY_THRESHOLD
+        ):
             exercise = existing_exercises[0]
-            msg = f"Reusing existing exercise {exercise.id} (score: {exercise.validation_score})"
-            logger.info(msg)
+            logger.info(
+                "Reusing existing exercise %s (score: %s)",
+                exercise.id,
+                exercise.validation_score,
+            )
 
             return GenerateExerciseResponse(
                 exercise=db_exercise_to_response(exercise),
@@ -223,7 +231,7 @@ async def generate_exercise(
 
 
 @router.get("")
-async def search_exercises(
+async def search_exercises(  # noqa: PLR0913
     db: Annotated[AsyncSession, Depends(get_db)],
     repository: Annotated[ExerciseRepository, Depends(get_exercise_repository)],
     grade: Annotated[
