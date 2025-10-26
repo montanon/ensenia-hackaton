@@ -26,13 +26,11 @@ function App() {
   };
 
   return (
-    <div className="flex h-screen overflow-hidden">
-      <div className="flex-1 overflow-auto relative">
-        <AppLayout>
-          {renderPage()}
-        </AppLayout>
-        <BubbleAssistant />
-      </div>
+    <div className="flex h-screen bg-gray-50">
+      <AppLayout>
+        {renderPage()}
+      </AppLayout>
+      <BubbleAssistant />
       <BubbleChatWindow />
     </div>
   );

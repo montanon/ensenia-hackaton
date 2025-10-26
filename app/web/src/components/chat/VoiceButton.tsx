@@ -77,21 +77,56 @@ export const VoiceButton: React.FC<VoiceButtonProps> = ({ onTranscript, disabled
         onTouchEnd={stopRecording}
         disabled={disabled}
         className={cn(
-          'w-full px-6 py-4 rounded-lg font-medium transition-all',
-          'focus:outline-none focus:ring-2 focus:ring-offset-2',
-          isRecording
-            ? 'bg-red-600 text-white animate-pulse'
-            : 'bg-blue-600 text-white hover:bg-blue-700',
+          'w-full px-6 py-4 rounded-lg font-medium',
+          'focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500',
+          'bg-blue-600 text-white hover:bg-blue-700',
+          'transition-colors duration-200',
+          isRecording && 'recording-button',
           disabled && 'opacity-50 cursor-not-allowed'
         )}
       >
         <div className="flex items-center justify-center gap-2">
-          <span className="text-2xl">{isRecording ? '🔴' : '🎤'}</span>
+          <span className={cn(
+            "text-2xl transition-transform duration-200",
+            isRecording && "recording-icon"
+          )}>
+            🎤
+          </span>
           <span>
             {isRecording ? 'Grabando...' : 'Mantén presionado para hablar'}
           </span>
         </div>
       </button>
+
+      <style>{`
+        @keyframes breathe {
+          0%, 100% {
+            transform: scale(1);
+            opacity: 1;
+          }
+          50% {
+            transform: scale(0.98);
+            opacity: 0.9;
+          }
+        }
+
+        @keyframes icon-pulse {
+          0%, 100% {
+            transform: scale(1);
+          }
+          50% {
+            transform: scale(1.1);
+          }
+        }
+
+        .recording-button {
+          animation: breathe 1.5s ease-in-out infinite;
+        }
+
+        .recording-icon {
+          animation: icon-pulse 0.8s ease-in-out infinite;
+        }
+      `}</style>
 
       {/* Live Transcript */}
       {transcript && (

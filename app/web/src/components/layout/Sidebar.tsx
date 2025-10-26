@@ -1,6 +1,5 @@
 import React, { useState } from 'react';
 import { useSessionStore } from '../../stores/sessionStore';
-import { useChatStore } from '../../stores/chatStore';
 import { useNavigationStore, type PageType } from '../../stores/navigationStore';
 import { SESSION_MODES } from '../../utils/constants';
 import type { SessionMode } from '../../types/session';
@@ -8,36 +7,20 @@ import { Button } from '../ui/Button';
 import { cn } from '../../utils/helpers';
 import { NewSessionDialog } from '../session/NewSessionDialog';
 import { ConfigurationDialog } from '../settings/ConfigurationDialog';
-import { sessionApi } from '../../services/api';
 
 export const Sidebar: React.FC = () => {
   const {
     currentSession,
     mode,
-    inputMode,
-    outputMode,
     setMode,
-    toggleInputMode,
-    toggleOutputMode,
     setCurrentSession,
-    addToHistory,
   } = useSessionStore();
-  const { clearMessages } = useChatStore();
   const { currentPage, setCurrentPage } = useNavigationStore();
 
   const [showNewSession, setShowNewSession] = useState(false);
   const [showConfiguration, setShowConfiguration] = useState(false);
-  const [isSwitchingMode, setIsSwitchingMode] = useState(false);
-  const [modeError, setModeError] = useState<string | null>(null);
 
-  const navigationPages: Array<{ id: PageType; label: string; icon: string }> = [
-    { id: 'learn', label: 'Aprender', icon: '📚' },
-    { id: 'practice', label: 'Practicar', icon: '✏️' },
-    { id: 'review', label: 'Repasar', icon: '📝' },
-    { id: 'evaluacion', label: 'Evaluación', icon: '✅' },
-  ];
-
-  const handleModeSelect = async (nextMode: SessionMode) => {
+  const handleModeSelect = (nextMode: SessionMode) => {
     setMode(nextMode);
 
     if (!currentSession) {
@@ -48,52 +31,19 @@ export const Sidebar: React.FC = () => {
       return;
     }
 
-    const confirmed = window.confirm(
-      'Cambiar el modo reiniciará la sesión actual. ¿Deseas continuar?'
-    );
-
-    if (!confirmed) {
-      setMode(currentSession.mode as SessionMode);
-      return;
-    }
-
-    setIsSwitchingMode(true);
-    setModeError(null);
-
-    try {
-      const response = await sessionApi.create({
-        grade: currentSession.grade,
-        subject: currentSession.subject,
-        mode: nextMode,
-      });
-
-      const newSession = {
-        id: response.session_id,
-        grade: response.grade,
-        subject: response.subject,
-        mode: response.mode,
-        created_at: response.created_at,
-        current_mode: 'text' as const,
-        research_context: currentSession.research_context,
-      };
-
-      setCurrentSession(newSession);
-      addToHistory(newSession);
-      clearMessages();
-    } catch (error) {
-      console.error('[Sidebar] Failed to switch learning mode:', error);
-      setModeError('No se pudo cambiar el modo. Intenta nuevamente.');
-      setMode(currentSession.mode as SessionMode);
-    } finally {
-      setIsSwitchingMode(false);
-    }
+    // Update the session mode without creating a new session
+    // The mode change only affects which system prompt is used
+    setCurrentSession({
+      ...currentSession,
+      mode: nextMode,
+    });
   };
 
   return (
     <div className="w-64 bg-white border-r border-gray-200 flex flex-col">
       {/* Header */}
       <div className="p-4 border-b border-gray-200">
-        <h1 className="text-xl font-bold text-gray-900">Ense<span className="text-blue-600">ñ</span>IA</h1>
+        <h1 className="text-xl font-bold text-gray-900">Enseñ<span className="text-blue-600">IA</span></h1>
         <p className="text-sm text-gray-500">Tu asistente educativo</p>
       </div>
 
@@ -124,30 +74,6 @@ export const Sidebar: React.FC = () => {
         </div>
       )}
 
-      {/* Navigation */}
-      <div className="p-4 border-b border-gray-200">
-        <h4 className="text-sm font-medium text-gray-700 mb-2">Navegación</h4>
-        <div className="space-y-1">
-          {navigationPages.map((page) => (
-            <button
-              key={page.id}
-              onClick={() => setCurrentPage(page.id)}
-              className={cn(
-                'w-full text-left px-3 py-2 rounded-lg text-sm transition-colors',
-                currentPage === page.id
-                  ? 'bg-blue-100 text-blue-900 font-medium'
-                  : 'text-gray-700 hover:bg-gray-100'
-              )}
-            >
-              <div className="flex items-center gap-2">
-                <span>{page.icon}</span>
-                <span>{page.label}</span>
-              </div>
-            </button>
-          ))}
-        </div>
-      </div>
-
       {/* Mode Selector */}
       {currentSession && (
         <div className="p-4 border-b border-gray-200">
@@ -156,14 +82,16 @@ export const Sidebar: React.FC = () => {
             {SESSION_MODES.map((sessionMode) => (
               <button
                 key={sessionMode.value}
-                onClick={() => handleModeSelect(sessionMode.value as SessionMode)}
+                onClick={() => {
+                  handleModeSelect(sessionMode.value as SessionMode);
+                  setCurrentPage(sessionMode.value as PageType);
+                }}
                 className={cn(
                   'w-full text-left px-3 py-2 rounded-lg text-sm transition-colors',
                   mode === sessionMode.value
                     ? 'bg-blue-100 text-blue-900 font-medium'
                     : 'text-gray-700 hover:bg-gray-100'
                 )}
-                disabled={isSwitchingMode}
               >
                 <div className="flex items-center gap-2">
                   <span>{sessionMode.icon}</span>
@@ -174,54 +102,6 @@ export const Sidebar: React.FC = () => {
                 </div>
               </button>
             ))}
-          </div>
-          {modeError && (
-            <p className="mt-2 text-xs text-red-600">{modeError}</p>
-          )}
-        </div>
-      )}
-
-      {/* I/O Mode Controls */}
-      {currentSession && (
-        <div className="p-4 border-b border-gray-200">
-          <h4 className="text-sm font-medium text-gray-700 mb-3">Preferencias</h4>
-
-          {/* Input Mode */}
-          <div className="mb-3">
-            <label className="text-xs text-gray-600 mb-1 block">Tu entrada:</label>
-            <div className="flex gap-2">
-              <button
-                onClick={() => toggleInputMode()}
-                aria-label={`Cambiar entrada a ${inputMode === 'text' ? 'voz' : 'texto'}`}
-                className={cn(
-                  'flex-1 px-3 py-2 rounded-lg text-sm font-medium transition-colors',
-                  inputMode === 'text'
-                    ? 'bg-green-100 text-green-900'
-                    : 'bg-gray-100 text-gray-700'
-                )}
-              >
-                📝 {inputMode === 'text' ? 'Texto' : 'Voz'}
-              </button>
-            </div>
-          </div>
-
-          {/* Output Mode */}
-          <div>
-            <label className="text-xs text-gray-600 mb-1 block">Respuesta del AI:</label>
-            <div className="flex gap-2">
-              <button
-                onClick={() => toggleOutputMode()}
-                aria-label={`Cambiar salida a ${outputMode === 'voice' ? 'texto' : 'audio'}`}
-                className={cn(
-                  'flex-1 px-3 py-2 rounded-lg text-sm font-medium transition-colors',
-                  outputMode === 'voice'
-                    ? 'bg-purple-100 text-purple-900'
-                    : 'bg-gray-100 text-gray-700'
-                )}
-              >
-                {outputMode === 'voice' ? '🔊 Audio' : '📖 Texto'}
-              </button>
-            </div>
           </div>
         </div>
       )}

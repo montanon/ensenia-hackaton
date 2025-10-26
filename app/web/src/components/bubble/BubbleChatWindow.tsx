@@ -144,6 +144,11 @@ export const BubbleChatWindow: React.FC = () => {
     };
   }, [isResizing]);
 
+  // Don't render chat window if no session
+  if (!currentSession) {
+    return null;
+  }
+
   return (
     <div
       ref={resizeRef}
@@ -197,28 +202,13 @@ export const BubbleChatWindow: React.FC = () => {
 
         {/* Messages Area */}
         <div className="flex-1 overflow-auto bg-gradient-to-b from-gray-50 to-white p-4">
-          {!currentSession ? (
-            <div className="h-full flex items-center justify-center">
-              <div className="text-center">
-                <div className="w-16 h-16 mx-auto mb-4 bg-blue-100 rounded-full flex items-center justify-center animate-pulse">
-                  <div className="w-8 h-8 bg-blue-500 rounded-full animate-ping-slow" />
-                </div>
-                <p className="text-gray-600 text-sm">
-                  Crea una sesión para comenzar
-                </p>
-              </div>
-            </div>
-          ) : (
-            <>
-              <MessageList />
+          <MessageList />
 
-              {/* Typing Indicator */}
-              {isStreaming && (
-                <div className="px-4 pb-4">
-                  <TypingIndicator />
-                </div>
-              )}
-            </>
+          {/* Typing Indicator */}
+          {isStreaming && (
+            <div className="px-4 pb-4">
+              <TypingIndicator />
+            </div>
           )}
         </div>
 

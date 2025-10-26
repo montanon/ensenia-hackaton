@@ -110,6 +110,11 @@ export const BubbleAssistant: React.FC = () => {
 
   const bubbleState = getBubbleState();
 
+  // Don't show bubble if no session
+  if (!currentSession) {
+    return null;
+  }
+
   return (
     <div className="fixed bottom-12 right-12 z-50 flex flex-col items-center gap-2">
       {/* Live Transcript */}

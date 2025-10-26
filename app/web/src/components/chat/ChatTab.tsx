@@ -205,19 +205,7 @@ export const ChatTab: React.FC = () => {
   };
 
   if (!currentSession) {
-    return (
-      <div className="h-full flex items-center justify-center bg-gray-50">
-        <div className="text-center">
-          <div className="text-6xl mb-4">🎓</div>
-          <h3 className="text-xl font-semibold text-gray-900 mb-2">
-            Sin sesión activa
-          </h3>
-          <p className="text-gray-600">
-            Crea una nueva sesión para comenzar
-          </p>
-        </div>
-      </div>
-    );
+    return null;
   }
 
   return (
