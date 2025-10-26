@@ -129,7 +129,10 @@ class TestGetLearningContent:
         )
 
         assert response.status_code == 202
-        assert "not yet generated" in response.json()["detail"].lower()
+        # Check for error message in custom error format
+        response_data = response.json()
+        assert "error" in response_data
+        assert "not yet generated" in response_data["error"]["message"].lower()
 
     @pytest.mark.asyncio
     async def test_get_learning_content_session_not_found(self, async_client):
@@ -137,7 +140,10 @@ class TestGetLearningContent:
         response = await async_client.get("/chat/sessions/99999/learning-content")
 
         assert response.status_code == 404
-        assert "not found" in response.json()["detail"].lower()
+        # Check for error message in custom error format
+        response_data = response.json()
+        assert "error" in response_data
+        assert "not found" in response_data["error"]["message"].lower()
 
     @pytest.mark.asyncio
     async def test_get_learning_content_structure(
@@ -189,7 +195,10 @@ class TestGetStudyGuide:
         )
 
         assert response.status_code == 202
-        assert "not yet generated" in response.json()["detail"].lower()
+        # Check for error message in custom error format
+        response_data = response.json()
+        assert "error" in response_data
+        assert "not yet generated" in response_data["error"]["message"].lower()
 
     @pytest.mark.asyncio
     async def test_get_study_guide_session_not_found(self, async_client):
@@ -197,7 +206,10 @@ class TestGetStudyGuide:
         response = await async_client.get("/chat/sessions/99999/study-guide")
 
         assert response.status_code == 404
-        assert "not found" in response.json()["detail"].lower()
+        # Check for error message in custom error format
+        response_data = response.json()
+        assert "error" in response_data
+        assert "not found" in response_data["error"]["message"].lower()
 
     @pytest.mark.asyncio
     async def test_get_study_guide_structure(
