@@ -111,7 +111,7 @@ export const BubbleAssistant: React.FC = () => {
   const bubbleState = getBubbleState();
 
   return (
-    <div className="fixed bottom-6 right-6 z-50 flex flex-col items-center gap-2">
+    <div className="fixed bottom-12 right-12 z-50 flex flex-col items-center gap-2">
       {/* Live Transcript */}
       {transcript && (
         <div className="max-w-xs p-3 bg-white border border-gray-200 rounded-lg shadow-lg mb-2 bubble-transcript">
@@ -131,14 +131,18 @@ export const BubbleAssistant: React.FC = () => {
           'bubble-assistant',
           `bubble-${bubbleState}`,
           'w-20 h-20 bg-gradient-to-br from-blue-500 to-blue-600',
-          'shadow-lg hover:shadow-xl transition-all cursor-pointer',
+          'shadow-lg hover:shadow-xl cursor-pointer',
           'flex items-center justify-center',
           'focus:outline-none focus:ring-4 focus:ring-blue-300',
-          'relative overflow-hidden',
-          isChatOpen && 'opacity-0 scale-0'
+          'relative overflow-visible',
+          'transition-all duration-300 ease-in-out',
+          isChatOpen && 'scale-0 opacity-0'
         )}
         aria-label={isChatOpen ? 'Close assistant' : 'Open assistant'}
-        style={{ willChange: 'transform, border-radius' }}
+        style={{
+          willChange: 'transform, border-radius',
+          transformOrigin: 'center center'
+        }}
       >
         {/* Glow effect for listening */}
         {isListening && (
