@@ -21,6 +21,9 @@ from app.ensenia.services.generation_service import GenerationService
 
 logger = logging.getLogger(__name__)
 
+# Constants
+MIN_POOL_THRESHOLD = 3
+
 
 class ExercisePoolService:
     """Service for managing exercise pools per session."""
@@ -40,7 +43,7 @@ class ExercisePoolService:
         self.generation_service = generation_service
         self.repository = repository
 
-    async def generate_initial_pool(
+    async def generate_initial_pool(  # noqa: PLR0913
         self,
         session_id: int,
         grade: int,
@@ -103,12 +106,16 @@ class ExercisePoolService:
         successful_ids = [
             ex_id for ex_id in exercise_ids if not isinstance(ex_id, Exception)
         ]
-        msg = f"Generated {len(successful_ids)}/{pool_size} exercises for session {session_id}"
-        logger.info(msg)
+        logger.info(
+            "Generated %d/%d exercises for session %s",
+            len(successful_ids),
+            pool_size,
+            session_id,
+        )
 
         return successful_ids
 
-    async def _generate_and_link_exercise(
+    async def _generate_and_link_exercise(  # noqa: PLR0913
         self,
         session_id: int,
         grade: int,
@@ -220,7 +227,7 @@ class ExercisePoolService:
             "completed_exercises": completed_exercises,
             "pending_exercises": pending_exercises,
             "pool_health": "healthy"
-            if pending_exercises >= 3
+            if pending_exercises >= MIN_POOL_THRESHOLD
             else "low"
             if pending_exercises > 0
             else "depleted",
@@ -249,18 +256,19 @@ class ExercisePoolService:
         pool_status = await self.get_pool_status(session_id, db)
 
         if pool_status["pending_exercises"] >= min_pool_size:
-            msg = (
-                f"Pool for session {session_id} is healthy "
-                f"({pool_status['pending_exercises']} pending), no refill needed"
+            logger.info(
+                "Pool for session %s is healthy (%s pending), no refill needed",
+                session_id,
+                pool_status["pending_exercises"],
             )
-            logger.info(msg)
             return []
 
-        msg = (
-            f"Pool for session {session_id} is low "
-            f"({pool_status['pending_exercises']} pending), refilling with {refill_count} exercises"
+        logger.info(
+            "Pool for session %s is low (%s pending), refilling with %s exercises",
+            session_id,
+            pool_status["pending_exercises"],
+            refill_count,
         )
-        logger.info(msg)
 
         # Load session to get parameters
         stmt = select(DBSession).where(DBSession.id == session_id)
@@ -307,8 +315,11 @@ class ExercisePoolService:
             ex_id for ex_id in exercise_ids if not isinstance(ex_id, Exception)
         ]
 
-        msg = f"Refilled pool for session {session_id} with {len(successful_ids)} new exercises"
-        logger.info(msg)
+        logger.info(
+            "Refilled pool for session %s with %s new exercises",
+            session_id,
+            len(successful_ids),
+        )
 
         return successful_ids
 

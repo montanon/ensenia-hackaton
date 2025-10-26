@@ -53,10 +53,10 @@ async def websocket_chat_endpoint(  # noqa: C901, PLR0912, PLR0915
     Message Types (Server -> Client):
         - {type: "connected", ...} - Connection established
         - {type: "text_chunk", content: "..."} - Streaming text response
-        - {type: "audio_ready", audio_id: "...", url: "..."} - TTS audio available
-        - {type: "stt_partial", transcript: "...", confidence: float} - Interim transcription
-        - {type: "stt_result", transcript: "...", confidence: float} - Final transcription
-        - {type: "mode_changed", mode: "text"|"audio"} - Output mode changed
+        - {type: "audio_ready", audio_id: "...", url: "..."} - TTS audio
+        - {type: "stt_partial", transcript: "...", confidence: float} - Interim
+        - {type: "stt_result", transcript: "...", confidence: float} - Final
+        - {type: "mode_changed", mode: "text"|"audio"} - Mode changed
         - {type: "message_complete", message_id: int} - Message streaming complete
         - {type: "error", message: "...", code: "..."} - Error occurred
         - {type: "pong"} - Response to ping
@@ -137,8 +137,11 @@ async def websocket_chat_endpoint(  # noqa: C901, PLR0912, PLR0915
             elif message_type == "set_mode":
                 # Handle mode switching
                 new_mode = message_data.get("mode")
-                msg = f"[WebSocket] Mode change requested for session {session_id}: {new_mode}"
-                logger.info(msg)
+                logger.info(
+                    "[WebSocket] Mode change requested for session %s: %s",
+                    session_id,
+                    new_mode,
+                )
 
                 if new_mode not in [OutputMode.TEXT.value, OutputMode.AUDIO.value]:
                     msg = f"[WebSocket] Invalid mode received: {new_mode}"
@@ -153,11 +156,17 @@ async def websocket_chat_endpoint(  # noqa: C901, PLR0912, PLR0915
                 try:
                     await chat_service.update_session_mode(session_id, new_mode, db)
                     await connection_manager.send_mode_changed(session_id, new_mode)
-                    msg = f"[WebSocket] Session {session_id} mode successfully changed to {new_mode}"
-                    logger.info(msg)
+                    logger.info(
+                        "[WebSocket] Session %s mode successfully changed to %s",
+                        session_id,
+                        new_mode,
+                    )
                 except Exception:
-                    msg = f"[WebSocket] Failed to update session {session_id} mode to {new_mode}"
-                    logger.exception(msg)
+                    logger.exception(
+                        "[WebSocket] Failed to update session %s mode to %s",
+                        session_id,
+                        new_mode,
+                    )
                     await connection_manager.send_error(
                         session_id, msg, "MODE_UPDATE_FAILED"
                     )
@@ -175,11 +184,16 @@ async def websocket_chat_endpoint(  # noqa: C901, PLR0912, PLR0915
                     # Decode base64 audio data
                     audio_bytes = base64.b64decode(audio_data_b64)
                     audio_buffer.append(audio_bytes)
-                    msg = f"[WebSocket] Audio chunk received for session {session_id}: {len(audio_bytes)} bytes"
-                    logger.debug(msg)
+                    logger.debug(
+                        "[WebSocket] Audio chunk received for session %s: %s bytes",
+                        session_id,
+                        len(audio_bytes),
+                    )
                 except Exception:
-                    msg = f"[WebSocket] Error decoding audio data for session {session_id}"
-                    logger.exception(msg)
+                    logger.exception(
+                        "[WebSocket] Error decoding audio data for session %s",
+                        session_id,
+                    )
                     await connection_manager.send_error(
                         session_id,
                         "Failed to decode audio data",
@@ -195,8 +209,10 @@ async def websocket_chat_endpoint(  # noqa: C901, PLR0912, PLR0915
                     continue
 
                 try:
-                    msg = f"[WebSocket] Starting Deepgram streaming transcription for session {session_id}"
-                    logger.info(msg)
+                    logger.info(
+                        "[WebSocket] Starting Deepgram streaming transcription for %s",
+                        session_id,
+                    )
 
                     # Create async generator from audio buffer
                     async def audio_chunk_generator() -> AsyncIterator[bytes]:
@@ -214,8 +230,11 @@ async def websocket_chat_endpoint(  # noqa: C901, PLR0912, PLR0915
                     ):
                         if result.is_final:
                             final_transcript = result.transcript
-                            msg = f"[WebSocket] Final transcript for session {session_id}: {final_transcript}"
-                            logger.info(msg)
+                            logger.info(
+                                "[WebSocket] Final transcript for session %s: %s",
+                                session_id,
+                                final_transcript,
+                            )
 
                             # Send final result
                             await connection_manager.send_message(
@@ -228,8 +247,11 @@ async def websocket_chat_endpoint(  # noqa: C901, PLR0912, PLR0915
                             )
                         elif result.transcript != last_partial:
                             last_partial = result.transcript
-                            msg = f"[WebSocket] Partial transcript for session {session_id}: {result.transcript}"
-                            logger.debug(msg)
+                            logger.debug(
+                                "[WebSocket] Partial transcript for session %s: %s",
+                                session_id,
+                                result.transcript,
+                            )
 
                             await connection_manager.send_message(
                                 session_id,
@@ -243,7 +265,7 @@ async def websocket_chat_endpoint(  # noqa: C901, PLR0912, PLR0915
                     # Clear buffer for next recording
                     audio_buffer.clear()
 
-                    # Automatically process the final transcribed message as a chat message
+                    # Auto-process final transcript as chat message
                     if final_transcript:
                         try:
                             await process_message_with_dual_stream(
@@ -253,8 +275,10 @@ async def websocket_chat_endpoint(  # noqa: C901, PLR0912, PLR0915
                                 db=db,
                             )
                         except Exception:
-                            msg = f"Error processing transcribed message for session {session_id}."
-                            logger.exception(msg)
+                            logger.exception(
+                                "Error processing transcribed message for session %s.",
+                                session_id,
+                            )
                             await connection_manager.send_error(
                                 session_id, msg, "PROCESSING_ERROR"
                             )
