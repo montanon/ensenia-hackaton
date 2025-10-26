@@ -6,6 +6,8 @@ import type {
   WSConnectedMessage,
   WSTextChunkMessage,
   WSAudioReadyMessage,
+  WSSTTPartialMessage,
+  WSSTTResultMessage,
   WSModeChangedMessage,
   WSMessageCompleteMessage,
   WSErrorMessage,
@@ -20,6 +22,8 @@ type MessageHandler = {
   onConnected?: (msg: WSConnectedMessage) => void;
   onTextChunk?: (msg: WSTextChunkMessage) => void;
   onAudioReady?: (msg: WSAudioReadyMessage) => void;
+  onSTTPartial?: (msg: WSSTTPartialMessage) => void;
+  onSTTResult?: (msg: WSSTTResultMessage) => void;
   onModeChanged?: (msg: WSModeChangedMessage) => void;
   onMessageComplete?: (msg: WSMessageCompleteMessage) => void;
   onError?: (msg: WSErrorMessage) => void;
@@ -78,6 +82,12 @@ export class WebSocketService {
       case 'audio_ready':
         this.handlers.onAudioReady?.(message);
         break;
+      case 'stt_partial':
+        this.handlers.onSTTPartial?.(message);
+        break;
+      case 'stt_result':
+        this.handlers.onSTTResult?.(message);
+        break;
       case 'mode_changed':
         this.handlers.onModeChanged?.(message);
         break;
@@ -109,6 +119,14 @@ export class WebSocketService {
 
   setMode(mode: 'text' | 'audio'): void {
     this.send({ type: 'set_mode', mode });
+  }
+
+  sendAudioChunk(audioData: string): void {
+    this.send({ type: 'audio_chunk', data: audioData });
+  }
+
+  sendAudioEnd(): void {
+    this.send({ type: 'audio_end' });
   }
 
   private startPing(): void {
