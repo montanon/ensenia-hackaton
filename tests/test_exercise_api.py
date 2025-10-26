@@ -355,7 +355,7 @@ class TestEndToEndWorkflow:
         self,
         mock_generate,
         async_client,
-        _db_session,
+        db_session,
         sample_api_session,
         sample_multiple_choice_exercise,
     ):
