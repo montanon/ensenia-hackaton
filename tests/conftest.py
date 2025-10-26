@@ -75,11 +75,10 @@ async def db_session() -> AsyncGenerator[AsyncSession, None]:
     async with AsyncSessionLocal() as session:
         try:
             yield session
-            await session.commit()
-        except Exception:
-            await session.rollback()
-            raise
         finally:
+            # Always rollback to ensure test isolation
+            # Tests should not persist data between runs
+            await session.rollback()
             await session.close()
 
 

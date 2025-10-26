@@ -62,10 +62,6 @@ class TestChatService:
             assert messages[1].role == "assistant"
             assert messages[1].content == "Test response from assistant"
 
-        # Cleanup
-        await db_session.delete(session)
-        await db_session.commit()
-
     async def test_send_message_with_previous_context(self, db_session: AsyncSession):
         """Test that send_message includes previous messages in context."""
         # Create test session with previous message
@@ -111,10 +107,6 @@ class TestChatService:
             assert len(messages_arg) >= 3
             assert any("Previous question" in str(msg) for msg in messages_arg)
 
-        # Cleanup
-        await db_session.delete(session)
-        await db_session.commit()
-
     async def test_mode_specific_prompts(self, db_session: AsyncSession):
         """Test that different modes generate appropriate system prompts."""
         modes = ["learn", "practice", "evaluation", "study"]
@@ -154,9 +146,6 @@ class TestChatService:
                 # Verify system message exists and is mode-appropriate
                 assert "asistente educativo" in system_message.lower()
                 assert len(system_message) > 100  # Has substantial content
-
-            await db_session.delete(session)
-            await db_session.commit()
 
     async def test_send_message_invalid_session(self, db_session: AsyncSession):
         """Test that send_message raises ValueError for invalid session."""
@@ -202,6 +191,3 @@ class TestChatService:
 
             system_message = messages_arg[0]["content"]
             assert "photosynthesis" in system_message.lower()
-
-        await db_session.delete(session)
-        await db_session.commit()
