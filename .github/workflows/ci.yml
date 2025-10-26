@@ -54,6 +54,12 @@ jobs:
         run: |
           uv sync --all-groups
 
+      - name: Run database migrations
+        run: |
+          uv run alembic upgrade head
+        env:
+          DATABASE_URL: postgresql+asyncpg://ensenia:hackathon@localhost:5433/ensenia
+
       - name: Run ruff linting
         run: |
           uv run ruff check .
