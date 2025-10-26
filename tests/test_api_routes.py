@@ -9,8 +9,9 @@ from app.ensenia.main import app
 
 
 @pytest.fixture
-async def client():
-    """Create async test client."""
+async def client(db_session):  # noqa: ARG001
+    """Create async test client with database dependency."""
+    # The db_session fixture ensures database is initialized
     transport = httpx.ASGITransport(app=app)
     async with httpx.AsyncClient(transport=transport, base_url="http://test") as ac:
         yield ac
