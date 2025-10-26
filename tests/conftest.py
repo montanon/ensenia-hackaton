@@ -1,9 +1,10 @@
 """Pytest configuration and fixtures."""
 
 import asyncio
-import os
+import logging
 import subprocess
 from collections.abc import AsyncGenerator
+from pathlib import Path
 from unittest.mock import MagicMock
 
 import pytest
@@ -11,6 +12,8 @@ from sqlalchemy import create_engine, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.ensenia.database.session import close_db, init_db, reset_engine
+
+logger = logging.getLogger(__name__)
 
 
 @pytest.fixture
@@ -44,7 +47,7 @@ async def setup_database():
 
 
 @pytest.fixture(autouse=True)
-async def reset_db_engine(mock_settings):
+async def reset_db_engine():
     """Reset the database engine before and after each test.
 
     This ensures the engine is not tied to a stale event loop.
@@ -66,35 +69,31 @@ def setup_test_db():
     3. Fails early if migrations don't succeed
 
     """
-    project_root = "/Users/sebastian/Desktop/MontagnaInc/Projects/ensenia-hackaton"
-    venv_alembic = os.path.join(project_root, ".venv", "bin", "alembic")
+    project_root = Path(__file__).parent.parent
+    venv_alembic = project_root / ".venv" / "bin" / "alembic"
 
     # Apply migrations using subprocess with explicit venv alembic
-    result = subprocess.run(
-        [venv_alembic, "upgrade", "head"],
-        cwd=project_root,
+    result = subprocess.run(  # noqa: S603
+        [str(venv_alembic), "upgrade", "head"],
+        cwd=str(project_root),
         capture_output=True,
         text=True,
+        check=False,
     )
 
     if result.returncode != 0:
-        print("=" * 80)
-        print("MIGRATION FAILED - Test database schema is not up to date!")
-        print("=" * 80)
-        print(f"Alembic stderr:\n{result.stderr}")
-        print(f"Alembic stdout:\n{result.stdout}")
-        print("=" * 80)
-        pytest.fail(
+        msg = (
             f"Database migrations failed. Cannot proceed with tests.\n"
             f"stderr: {result.stderr}\nstdout: {result.stdout}"
         )
+        logger.error(msg)
+        pytest.fail(msg)
 
     # Verify critical schema columns exist using direct database connection
-    try:
-        # Use synchronous engine for schema verification (psycopg3 works with sync)
-        db_url = "postgresql+psycopg://ensenia:hackathon@localhost:5433/test"
-        engine = create_engine(db_url)
+    db_url = "postgresql+psycopg://ensenia:hackathon@localhost:5433/test"
+    engine = create_engine(db_url)
 
+    try:
         with engine.begin() as conn:
             # Check that critical columns exist on sessions table
             result = conn.execute(
@@ -111,19 +110,19 @@ def setup_test_db():
             missing_columns = required_columns - columns
 
             if missing_columns:
-                pytest.fail(
+                msg = (
                     f"Database schema verification failed!\n"
                     f"Missing columns: {missing_columns}\n"
                     f"Available columns: {columns}"
                 )
+                pytest.fail(msg)
 
+        logger.info("Test database schema verified successfully")
+    except (OSError, RuntimeError) as e:
+        msg = f"Failed to verify test database schema: {e}"
+        pytest.fail(msg)
+    finally:
         engine.dispose()
-        print("✓ Test database schema verified successfully")
-    except Exception as e:
-        pytest.fail(f"Failed to verify test database schema: {e}")
-
-    yield
-    # Cleanup happens automatically after tests complete
 
 
 @pytest.fixture
