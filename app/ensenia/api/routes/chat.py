@@ -323,9 +323,8 @@ async def update_session_mode(
     """
     try:
         chat_service = get_chat_service()
-        chat_service.db = db
 
-        await chat_service.update_session_mode(session_id, request.mode)
+        await chat_service.update_session_mode(session_id, request.mode, db)
 
         return UpdateModeResponse(session_id=session_id, mode=request.mode)
 

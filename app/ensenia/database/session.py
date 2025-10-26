@@ -14,11 +14,10 @@ from sqlalchemy.ext.asyncio import (
     create_async_engine,
 )
 
-from app.ensenia.config import get_settings
+from app.ensenia.core.config import settings
 from app.ensenia.database.models import Base
 
 logger = logging.getLogger(__name__)
-settings = get_settings()
 
 # Create async engine
 engine: AsyncEngine = create_async_engine(

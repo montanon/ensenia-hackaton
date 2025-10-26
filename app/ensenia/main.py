@@ -8,18 +8,23 @@ Integrates:
 """
 
 import logging
-from collections.abc import AsyncGenerator
+import time
+from collections.abc import AsyncGenerator, Callable
 from contextlib import asynccontextmanager
+from http import HTTPStatus
 from pathlib import Path
 from typing import Any
 
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException, Request, Response
+from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
 
 from app.ensenia.api.routes import chat, exercises, tts, websocket
-from app.ensenia.config import get_settings
+from app.ensenia.core.config import settings
 from app.ensenia.database.session import close_db, init_db
+from app.ensenia.schemas.errors import ErrorCode, ErrorDetail, ErrorResponse
 from app.ensenia.services.research_service import cleanup_research_service
 
 # Configure logging
@@ -28,7 +33,6 @@ logging.basicConfig(
 )
 
 logger = logging.getLogger(__name__)
-settings = get_settings()
 
 
 @asynccontextmanager
@@ -65,6 +69,75 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+
+# Performance monitoring middleware
+@app.middleware("http")
+async def add_process_time_header(
+    request: Request, call_next: Callable[[Request], Any]
+) -> Response:
+    """Add X-Process-Time header to all responses showing request duration."""
+    start_time = time.perf_counter()
+    response = await call_next(request)
+    process_time = time.perf_counter() - start_time
+    response.headers["X-Process-Time"] = f"{process_time:.4f}"
+    response.headers["X-Process-Time-Ms"] = f"{process_time * 1000:.2f}"
+    return response
+
+
+# Exception handlers for standardized error responses
+@app.exception_handler(HTTPException)
+async def http_exception_handler(request: Request, exc: HTTPException) -> JSONResponse:
+    """Handle HTTPException with standardized error format."""
+    # Map HTTP status codes to error codes
+    error_code = ErrorCode.INTERNAL_ERROR
+    if exc.status_code == HTTPStatus.NOT_FOUND:
+        error_code = ErrorCode.RESOURCE_NOT_FOUND
+    if exc.status_code == HTTPStatus.BAD_REQUEST:
+        error_code = ErrorCode.VALIDATION_ERROR
+    if exc.status_code == HTTPStatus.UNPROCESSABLE_ENTITY:
+        error_code = ErrorCode.VALIDATION_ERROR
+    if exc.status_code == HTTPStatus.INTERNAL_SERVER_ERROR:
+        error_code = ErrorCode.INTERNAL_ERROR
+
+    # Check if a custom error_code was set on the exception
+    if hasattr(exc, "error_code"):
+        error_code = exc.error_code
+
+    error_response = ErrorResponse(
+        error=ErrorDetail(
+            code=error_code,
+            message=str(exc.detail),
+        ),
+        path=request.url.path,
+    )
+    return JSONResponse(
+        status_code=exc.status_code,
+        content=error_response.model_dump(mode="json"),
+    )
+
+
+@app.exception_handler(RequestValidationError)
+async def validation_exception_handler(
+    request: Request, exc: RequestValidationError
+) -> JSONResponse:
+    """Handle Pydantic validation errors with standardized format."""
+    first_error = exc.errors()[0]
+    field = ".".join(str(loc) for loc in first_error["loc"])
+
+    error_response = ErrorResponse(
+        error=ErrorDetail(
+            code=ErrorCode.VALIDATION_ERROR,
+            message=first_error["msg"],
+            field=field,
+        ),
+        path=request.url.path,
+    )
+    return JSONResponse(
+        status_code=HTTPStatus.UNPROCESSABLE_ENTITY,
+        content=error_response.model_dump(mode="json"),
+    )
+
 
 # Include routers
 app.include_router(tts.router)
@@ -108,7 +181,7 @@ def root() -> dict[str, Any]:
             },
             "exercises": {
                 "generate": "POST /exercises/generate",
-                "search": "POST /exercises/search",
+                "search": "GET /exercises?grade=8&subject=Matemáticas",
                 "get": "GET /exercises/{id}",
                 "link_to_session": "POST /exercises/{id}/sessions/{session_id}",
                 "submit_answer": (

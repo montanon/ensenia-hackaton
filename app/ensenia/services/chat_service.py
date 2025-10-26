@@ -12,13 +12,13 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
-from app.ensenia.config import get_settings
+from app.ensenia.core.config import settings
 from app.ensenia.database.models import Message as DBMessage
+from app.ensenia.database.models import OutputMode
 from app.ensenia.database.models import Session as DBSession
 from app.ensenia.models import ChatMode
 
 logger = logging.getLogger(__name__)
-settings = get_settings()
 
 
 # System prompts for different modes
@@ -90,18 +90,12 @@ Instrucciones:
 class ChatService:
     """Service for OpenAI chat operations."""
 
-    def __init__(self, db: AsyncSession | None = None):
-        """Initialize the OpenAI client.
-
-        Args:
-            db: Optional databae session (for dependency injection)
-
-        """
+    def __init__(self):
+        """Initialize the OpenAI client."""
         self.client = AsyncOpenAI(api_key=settings.openai_api_key)
         self.model = settings.openai_model
         self.max_tokens = settings.openai_max_tokens
         self.temperature = settings.openai_temperature
-        self.db = db
 
     def _build_system_prompt(
         self, mode: str, grade: int, subject: str, research_context: str | None
@@ -309,50 +303,47 @@ class ChatService:
             logger.exception("Error in streaming chat completion")
             raise
 
-    async def get_session(self, session_id: int) -> DBSession | None:
+    async def get_session(self, session_id: int, db: AsyncSession) -> DBSession | None:
         """Get a session by ID with messages loaded.
 
         Args:
             session_id: The session ID to fetch
+            db: Database session
 
         Returns:
             Session object or None if not found
 
         """
-        if not self.db:
-            msg = "Database session not provided to ChatService"
-            raise ValueError(msg)
-
         stmt = (
             select(DBSession)
             .options(selectinload(DBSession.messages))
             .where(DBSession.id == session_id)
         )
 
-        result = await self.db.execute(stmt)
+        result = await db.execute(stmt)
         return result.scalar_one_or_none()
 
-    async def update_session_mode(self, session_id: int, new_mode: str) -> None:
+    async def update_session_mode(
+        self, session_id: int, new_mode: str, db: AsyncSession
+    ) -> None:
         """Update a session's current output mode (text/audio).
 
         Args:
             session_id: The session ID to update
             new_mode: The new mode ('text' or 'audio')
+            db: Database session
 
         Raises:
             ValueError: If session not found or invalid mode
 
         """
-        if not self.db:
-            msg = "Database session not provided to ChatService"
-            raise ValueError(msg)
-
-        if new_mode not in ["text", "audio"]:
-            msg = f"Invalid mode: {new_mode}"
+        # Validate mode using enum
+        if new_mode not in [OutputMode.TEXT.value, OutputMode.AUDIO.value]:
+            msg = f"Invalid mode: {new_mode}. Must be 'text' or 'audio'"
             raise ValueError(msg)
 
         stmt = select(DBSession).where(DBSession.id == session_id)
-        result = await self.db.execute(stmt)
+        result = await db.execute(stmt)
         session = result.scalar_one_or_none()
 
         if not session:
@@ -362,11 +353,11 @@ class ChatService:
         session.current_mode = new_mode
 
         try:
-            await self.db.commit()
+            await db.commit()
             msg = f"Session {session_id} mode updated to {new_mode}"
             logger.info(msg)
         except Exception:
-            await self.db.rollback()
+            await db.rollback()
             logger.exception(msg)
             raise
 

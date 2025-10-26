@@ -7,6 +7,7 @@ Handles:
 - Streaming support
 """
 
+import asyncio
 import hashlib
 import json
 import logging
@@ -18,10 +19,9 @@ import aiofiles
 from elevenlabs import VoiceSettings
 from elevenlabs.client import AsyncElevenLabs
 
-from app.ensenia.config import get_settings
+from app.ensenia.core.config import settings
 
 logger = logging.getLogger(__name__)
-settings = get_settings()
 
 BASIC_LEVEL_THRESHOLD = 4
 MEDIUM_LEVEL_THRESHOLD = 8
@@ -75,7 +75,8 @@ class ElevenLabsService:
         age_hours = (time.time() - cache_file.stat().st_mtime) / 3600
         if age_hours > settings.cache_ttl_hours:
             logger.info("Cache expired: %s (age: %.1fh)", cache_key, age_hours)
-            cache_file.unlink()  # Delete expired cache
+            # Delete expired cache asynchronously
+            await asyncio.to_thread(cache_file.unlink)
             return None
 
         logger.info("Cache hit: %s", cache_key)

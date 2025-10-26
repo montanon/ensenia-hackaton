@@ -79,7 +79,7 @@ class TestSimpleTTS:
         response = await client.get("/tts/speak?text=invalid&grade=5")
 
         assert response.status_code == 400
-        assert "Text too long" in response.json()["detail"]
+        assert "Text too long" in response.json()["error"]["message"]
 
     async def test_missing_text_parameter(
         self,
@@ -105,7 +105,7 @@ class TestSimpleTTS:
         response = await client.get("/tts/speak?text=Hola&grade=5")
 
         assert response.status_code == 500
-        assert "TTS generation failed" in response.json()["detail"]
+        assert "TTS generation failed" in response.json()["error"]["message"]
 
     async def test_default_grade_level(self, client, mock_service, mock_text_processor):
         """Use default grade level when not specified."""
@@ -328,7 +328,7 @@ class TestBatchTTS:
         )
 
         assert response.status_code == 400
-        assert "Invalid segment" in response.json()["detail"]
+        assert "Invalid segment" in response.json()["error"]["message"]
 
     async def test_empty_segments_list(self, client, mock_service, mock_text_processor):
         """Reject empty segments list."""

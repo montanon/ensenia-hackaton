@@ -12,10 +12,15 @@ import logging
 from typing import Any
 
 from fastapi import APIRouter, Depends, WebSocket, WebSocketDisconnect
+from fastapi.websockets import WebSocketState
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.ensenia.database.models import OutputMode
 from app.ensenia.database.session import get_db
 from app.ensenia.services.chat_service import ChatService
+from app.ensenia.services.stream_orchestrator import (
+    process_message_with_dual_stream,
+)
 from app.ensenia.services.websocket_manager import connection_manager
 
 logger = logging.getLogger(__name__)
@@ -52,11 +57,11 @@ async def websocket_chat_endpoint(  # noqa: C901, PLR0912, PLR0915
 
     """
     # Initialize services
-    chat_service = ChatService(db)
+    chat_service = ChatService()
 
     # Verify session exists
     try:
-        session = await chat_service.get_session(session_id)
+        session = await chat_service.get_session(session_id, db)
         if not session:
             await websocket.close(code=404, reason="Session not found")
             return
@@ -108,7 +113,7 @@ async def websocket_chat_endpoint(  # noqa: C901, PLR0912, PLR0915
             elif message_type == "set_mode":
                 # Handle mode switching
                 new_mode = message_data.get("mode")
-                if new_mode not in ["text", "audio"]:
+                if new_mode not in [OutputMode.TEXT.value, OutputMode.AUDIO.value]:
                     await connection_manager.send_error(
                         session_id,
                         f"Invalid mode: {new_mode}. Must be 'text' or 'audio'",
@@ -117,7 +122,7 @@ async def websocket_chat_endpoint(  # noqa: C901, PLR0912, PLR0915
                     continue
 
                 try:
-                    await chat_service.update_session_mode(session_id, new_mode)
+                    await chat_service.update_session_mode(session_id, new_mode, db)
                     await connection_manager.send_mode_changed(session_id, new_mode)
                     msg = f"Session {session_id} mode changed to {new_mode}"
                     logger.info(msg)
@@ -136,11 +141,6 @@ async def websocket_chat_endpoint(  # noqa: C901, PLR0912, PLR0915
                         session_id, "Message content is required", "MISSING_CONTENT"
                     )
                     continue
-
-                # Import here to avoid circular dependency
-                from app.ensenia.services.stream_orchestrator import (  # noqa: PLC0415
-                    process_message_with_dual_stream,
-                )
 
                 try:
                     await process_message_with_dual_stream(
@@ -172,7 +172,8 @@ async def websocket_chat_endpoint(  # noqa: C901, PLR0912, PLR0915
         logger.exception(msg)
         connection_manager.disconnect(session_id)
         try:
-            await websocket.close(code=1011, reason="Internal server error")
+            if websocket.client_state == WebSocketState.CONNECTED:
+                await websocket.close(code=1011, reason="Internal server error")
         except Exception:
             msg = "Failed to close WebSocket connection after error."
             logger.exception(msg)
