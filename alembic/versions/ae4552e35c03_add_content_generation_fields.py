@@ -1,4 +1,4 @@
-"""Add content generation fields to sessions table
+"""Add content generation fields to sessions table.
 
 Revision ID: ae4552e35c03
 Revises: ae4552e35c02
@@ -6,7 +6,8 @@ Create Date: 2025-10-26 10:30:00.000000
 
 """
 
-from typing import Sequence, Union
+from collections.abc import Sequence
+from typing import Union
 
 import sqlalchemy as sa
 from sqlalchemy.dialects import postgresql

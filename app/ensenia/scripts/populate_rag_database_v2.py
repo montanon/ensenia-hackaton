@@ -19,7 +19,6 @@ import argparse
 import asyncio
 import logging
 import re
-import sys
 from pathlib import Path
 from typing import Any
 
@@ -70,6 +69,7 @@ class RAGDatabasePopulator:
 
         Args:
             db_session: Database session
+
         """
         self.db = db_session
         self.pdf_processor = PDFProcessor()
@@ -88,6 +88,7 @@ class RAGDatabasePopulator:
 
         Returns:
             Dictionary with processing statistics
+
         """
         if not grade_dir.exists():
             msg = f"Grade directory not found: {grade_dir}"
@@ -202,6 +203,7 @@ class RAGDatabasePopulator:
 
         Returns:
             Processing statistics
+
         """
         stats = {
             "files_processed": 0,
@@ -320,6 +322,7 @@ class RAGDatabasePopulator:
 
         Returns:
             Processing statistics
+
         """
         logger.info("Processing existing curriculum content...")
 

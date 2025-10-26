@@ -53,7 +53,6 @@ class ChunkingStrategy(ABC):
             List of TextChunk objects with appropriate metadata
 
         """
-        pass
 
     @abstractmethod
     def get_chunk_size(self) -> int:
@@ -63,7 +62,6 @@ class ChunkingStrategy(ABC):
             Target size of chunks in characters
 
         """
-        pass
 
     @abstractmethod
     def get_overlap(self) -> int:
@@ -73,4 +71,3 @@ class ChunkingStrategy(ABC):
             Number of overlapping characters between consecutive chunks
 
         """
-        pass

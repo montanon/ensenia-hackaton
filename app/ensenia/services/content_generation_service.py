@@ -43,7 +43,7 @@ class ContentGenerationService:
 
         """
         try:
-            prompt = f"""Basándote en el siguiente contexto curricular, crea una guía de 
+            prompt = f"""Basándote en el siguiente contexto curricular, crea una guía de
             aprendizaje estructurada para estudiantes chilenos.
 
 CONTEXTO CURRICULAR:
@@ -141,8 +141,8 @@ Responde SOLO con el JSON válido, sin texto adicional."""
 
         """
         try:
-            prompt = f"""Basándote en el siguiente contexto curricular, crea una guía 
-            de estudio para estudiantes chilenos que necesitan 
+            prompt = f"""Basándote en el siguiente contexto curricular, crea una guía
+            de estudio para estudiantes chilenos que necesitan
             revisar y consolidar su aprendizaje.
 
 CONTEXTO CURRICULAR:

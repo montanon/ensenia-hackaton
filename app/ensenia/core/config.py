@@ -85,7 +85,6 @@ class Settings(BaseSettings):
     stt_model: str = "whisper-1"
 
     # Deepgram (Streaming Speech-to-Text)
-    deepgram_api_key: str = ""
 
     # Exercise Generation Settings
     generation_max_iterations: int = (
