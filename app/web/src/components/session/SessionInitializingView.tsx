@@ -32,12 +32,12 @@ export const SessionInitializingView: React.FC = () => {
     );
   }
 
-  // Calculate progress percentage - includes content generation
-  const baseProgress = initStatus.research_loaded ? 25 : 0;
-  const exerciseProgress = initStatus.initial_exercises_ready ? 25 : (Math.min(initStatus.exercise_count || 0, 5) / 5) * 25;
-  const contentProgress = initStatus.learning_content_ready ? 25 : 0;
-  const guideProgress = initStatus.study_guide_ready ? 25 : 0;
-  const progress = baseProgress + exerciseProgress + contentProgress + guideProgress;
+  // Calculate progress percentage
+  const progress = initStatus.research_loaded && initStatus.initial_exercises_ready
+    ? 100
+    : initStatus.research_loaded
+    ? 60 + (Math.min(initStatus.exercise_count, 5) / 5) * 35
+    : 30;
 
   return (
     <div className="h-full flex flex-col items-center justify-center gap-8 bg-gradient-to-b from-gray-50 to-white p-6">
@@ -76,15 +76,16 @@ export const SessionInitializingView: React.FC = () => {
             <svg className="w-5 h-5 text-blue-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
             </svg>
-            <span>Investigación curricular</span>
+            <span>Análisis de currículo</span>
           </span>
           {initStatus.research_loaded ? (
             <svg className="w-5 h-5 text-green-600" fill="currentColor" viewBox="0 0 20 20">
               <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
             </svg>
           ) : (
-            <svg className="w-5 h-5 text-gray-400 animate-spin" fill="currentColor" viewBox="0 0 20 20">
-              <path d="M4.555 5.659c0 1.456.91 2.734 2.216 3.272-.056.682-.496 4.573-1.979 5.951-1.527 1.44.632 3.645 2.5 2.915 1.808-.715 4.062-1.86 5.204-3.857 1.142 1.997 3.396 3.142 5.204 3.857 1.868.73 4.027-1.475 2.5-2.915-1.483-1.378-1.923-5.269-1.979-5.951 1.306-.538 2.216-1.816 2.216-3.272 0-1.71-1.944-3.051-4.154-3.051-.39 0-.779.045-1.156.141A4.065 4.065 0 0012 1c-2.62 0-4.956 1.036-6.222 2.247-.377-.096-.766-.141-1.156-.141-2.21 0-4.154 1.34-4.154 3.051z" />
+            <svg className="w-5 h-5 text-blue-500 animate-spin" fill="none" viewBox="0 0 24 24">
+              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="2" />
+              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
             </svg>
           )}
         </div>
@@ -144,6 +145,38 @@ export const SessionInitializingView: React.FC = () => {
           )}
         </div>
       </div>
+
+      {/* Exercise Cards Animation */}
+      {initStatus.research_loaded && !initStatus.initial_exercises_ready && (
+        <div className="w-full max-w-md">
+          <p className="text-sm font-medium text-gray-700 mb-3 text-center">
+            Preparando ejercicios personalizados...
+          </p>
+          <div className="grid grid-cols-5 gap-2">
+            {[0, 1, 2, 3, 4].map((index) => (
+              <div
+                key={index}
+                className={`aspect-square rounded-lg border-2 transition-all duration-500 flex items-center justify-center ${
+                  index < initStatus.exercise_count
+                    ? 'border-green-500 bg-green-50 scale-100 opacity-100'
+                    : 'border-gray-200 bg-gray-50 scale-95 opacity-50'
+                }`}
+                style={{
+                  transitionDelay: `${index * 100}ms`,
+                }}
+              >
+                {index < initStatus.exercise_count ? (
+                  <svg className="w-6 h-6 text-green-600 animate-bounce" fill="currentColor" viewBox="0 0 20 20" style={{ animationDelay: `${index * 100}ms` }}>
+                    <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                  </svg>
+                ) : (
+                  <div className="w-2 h-2 bg-gray-300 rounded-full animate-pulse" style={{ animationDelay: `${index * 150}ms` }} />
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* Info Message */}
       <p className="text-center text-sm text-gray-600 max-w-md">

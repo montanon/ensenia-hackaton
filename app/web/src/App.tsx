@@ -38,7 +38,7 @@ function App() {
 
   // Reset page to landing if user logs out
   useEffect(() => {
-    if (!isAuthenticated && (currentPage === 'learn' || currentPage === 'practice' || currentPage === 'review' || currentPage === 'evaluacion')) {
+    if (!isAuthenticated && (currentPage === 'learn' || currentPage === 'practice' || currentPage === 'review' || currentPage === 'study' || currentPage === 'evaluacion')) {
       setCurrentPage('landing');
     }
   }, [isAuthenticated, currentPage, setCurrentPage]);
@@ -62,6 +62,7 @@ function App() {
       case 'practice':
         return <PracticePage />;
       case 'review':
+      case 'study':
         return <ReviewPage />;
       case 'evaluacion':
         return <EvaluacionPage />;
@@ -74,7 +75,7 @@ function App() {
   };
 
   // For authenticated users, show full app layout with sidebar
-  if (isAuthenticated && (currentPage === 'learn' || currentPage === 'practice' || currentPage === 'review' || currentPage === 'evaluacion')) {
+  if (isAuthenticated && (currentPage === 'learn' || currentPage === 'practice' || currentPage === 'review' || currentPage === 'study' || currentPage === 'evaluacion')) {
     return (
       <div className="flex h-screen overflow-hidden">
         {/* Sidebar - always visible */}

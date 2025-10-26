@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useSessionStore } from '../stores/sessionStore';
 import { sessionApi } from '../services/api';
+import { SessionInitializingView } from '../components/session/SessionInitializingView';
 
 interface StudyGuide {
   title: string;
@@ -26,10 +27,15 @@ interface StudyGuide {
 }
 
 export const ReviewPage: React.FC = () => {
-  const { currentSession } = useSessionStore();
+  const { currentSession, isInitializing } = useSessionStore();
   const [studyGuide, setStudyGuide] = useState<StudyGuide | null>(null);
   const [guideLoading, setGuideLoading] = useState(false);
   const [guideError, setGuideError] = useState<string | null>(null);
+
+  // Show initializing view while session is being set up
+  if (isInitializing) {
+    return <SessionInitializingView />;
+  }
 
   // Load study guide when session changes
   useEffect(() => {

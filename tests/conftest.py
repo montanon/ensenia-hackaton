@@ -58,24 +58,29 @@ async def db_session() -> AsyncGenerator[AsyncSession, None]:
     """Provide a database session for tests.
 
     This creates a new session for each test to avoid event loop conflicts.
+    Explicitly depends on reset_db_engine to ensure proper ordering.
     """
     # Import here to avoid circular dependency issues
     # Ensure database is initialized
     from app.ensenia.database.models import Base
     from app.ensenia.database.session import AsyncSessionLocal, engine
 
-    async with engine.begin() as conn:
-        await conn.run_sync(Base.metadata.create_all)
+    try:
+        async with engine.begin() as conn:
+            await conn.run_sync(Base.metadata.create_all)
 
-    # Create and yield session
-    async with AsyncSessionLocal() as session:
-        try:
-            yield session
-        finally:
-            # Always rollback to ensure test isolation
-            # Tests should not persist data between runs
-            await session.rollback()
-            await session.close()
+        # Create and yield session
+        async with AsyncSessionLocal() as session:
+            try:
+                yield session
+            finally:
+                # Always rollback to ensure test isolation
+                await session.rollback()
+                await session.close()
+    except Exception:
+        # If there's an error creating the session, still try to close the engine
+        await engine.dispose()
+        raise
 
 
 @pytest.fixture(autouse=True)
