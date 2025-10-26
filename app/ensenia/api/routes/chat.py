@@ -4,7 +4,9 @@ Endpoints for managing chat sessions, sending messages,
 and triggering research context updates.
 """
 
+import asyncio
 import logging
+from collections.abc import Callable
 from datetime import datetime
 from typing import Annotated, Any
 
@@ -15,14 +17,25 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from app.ensenia.database.models import Session as DBSession
-from app.ensenia.database.session import get_db
+from app.ensenia.database.session import AsyncSessionLocal, get_db
 from app.ensenia.models import ChatMode
 from app.ensenia.services.chat_service import get_chat_service
+from app.ensenia.services.exercise_pool_service import (
+    get_exercise_pool_service,
+)
+from app.ensenia.services.exercise_repository import (
+    get_exercise_repository,
+)
+from app.ensenia.services.generation_service import (
+    get_generation_service,
+)
 from app.ensenia.services.research_service import get_research_service
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/chat", tags=["chat"])
+
+background_tasks: set[asyncio.Task] = set()
 
 
 # Request/Response Models
@@ -106,10 +119,84 @@ class SessionResponse(BaseModel):
     messages: list[MessageResponse]
 
 
+# Background task for session initialization
+async def initialize_session_background(
+    session_id: int,
+    grade: int,
+    subject: str,
+    topic: str | None,
+    db_session_maker: Callable[[], AsyncSession],
+) -> None:
+    """Background task to initialize session with research and exercises.
+
+    Args:
+        session_id: Session ID
+        grade: Grade level
+        subject: Subject area
+        topic: Optional topic for research
+        db_session_maker: Database session factory
+
+    """
+    try:
+        # Create a new database session for background task
+        async with db_session_maker() as db:
+            research_service = get_research_service()
+            generation_service = get_generation_service()
+            repository = get_exercise_repository()
+            pool_service = get_exercise_pool_service(generation_service, repository)
+
+            # Determine research topic
+            research_topic = topic or f"{subject} - {grade}° Básico"
+
+            # Step 1: Load research context
+            msg = f"[Background] Starting research for session {session_id} on topic: {research_topic}"
+            logger.info(msg)
+            try:
+                context = await research_service.update_session_context(
+                    session_id, research_topic, db
+                )
+                msg = f"[Background] Research completed for session {session_id}"
+                logger.info(msg)
+            except Exception:
+                msg = f"[Background] Research failed for session {session_id}"
+                logger.exception(msg)
+                context = None
+
+            # Step 2: Generate initial exercise pool
+            msg = f"[Background] Generating initial exercise pool for session {session_id}"
+            logger.info(msg)
+            try:
+                exercise_ids = await pool_service.generate_initial_pool(
+                    session_id=session_id,
+                    grade=grade,
+                    subject=subject,
+                    topic=research_topic,
+                    db=db,
+                    pool_size=5,
+                    curriculum_context=context,
+                )
+                msg = f"[Background] Generated {len(exercise_ids)} exercises for session {session_id}"
+                logger.info(msg)
+            except Exception:
+                msg = (
+                    f"[Background] Exercise generation failed for session {session_id}"
+                )
+                logger.exception(msg)
+
+            msg = f"[Background] Session {session_id} initialization complete"
+            logger.info(msg)
+
+    except Exception as e:
+        msg = f"[Background] Fatal error in session {session_id} initialization"
+        logger.exception(msg)
+        raise Exception(msg) from e
+
+
 # Endpoints
 @router.post("/sessions")
 async def create_session(
-    request: CreateSessionRequest, db: Annotated[AsyncSession, Depends(get_db)]
+    request: CreateSessionRequest,
+    db: Annotated[AsyncSession, Depends(get_db)],
 ) -> CreateSessionResponse:
     """Create a new chat session.
 
@@ -144,25 +231,27 @@ async def create_session(
             session.mode,
         )
 
-        # Get initial research context if topic provided
-        context_loaded = False
-        if request.topic:
-            research_service = get_research_service()
-            try:
-                await research_service.update_session_context(
-                    session.id, request.topic, db
-                )
-                context_loaded = True
-                logger.info("Loaded research context for session %s", session.id)
-            except Exception:
-                logger.exception("Error loading research context")
-
+        # Trigger background initialization (research + exercise generation)
+        # This runs asynchronously without blocking the response
+        task = asyncio.create_task(
+            initialize_session_background(
+                session_id=session.id,
+                grade=request.grade,
+                subject=request.subject,
+                topic=request.topic,
+                db_session_maker=AsyncSessionLocal,
+            )
+        )
+        background_tasks.add(task)
+        task.add_done_callback(background_tasks.discard)
+        msg = f"Session {session.id} created, background initialization started"
+        logger.info(msg)
         return CreateSessionResponse(
             session_id=session.id,
             grade=session.grade,
             subject=session.subject,
             mode=session.mode,
-            context_loaded=context_loaded,
+            context_loaded=False,  # Background task handles this
             created_at=session.created_at,
         )
 
@@ -332,6 +421,59 @@ async def update_session_mode(
         raise HTTPException(status_code=404, detail=str(e)) from e
     except Exception as e:
         logger.exception("Error updating session mode")
+        raise HTTPException(status_code=500, detail=str(e)) from e
+
+
+@router.get("/sessions/{session_id}/status")
+async def get_session_status(
+    session_id: int,
+    db: Annotated[AsyncSession, Depends(get_db)],
+) -> dict[str, Any]:
+    """Get session initialization status.
+
+    Returns information about whether research context has loaded
+    and how many exercises are ready.
+
+    Args:
+        session_id: Session ID
+        db: Database session
+
+    Returns:
+        Session status including research and exercise pool status
+
+    Raises:
+        HTTPException: If session not found
+
+    """
+    try:
+        # Load session
+        stmt = select(DBSession).where(DBSession.id == session_id)
+        result = await db.execute(stmt)
+        session = result.scalar_one_or_none()
+
+        if not session:
+            raise HTTPException(status_code=404, detail="Session not found")
+
+        # Get exercise pool status
+        generation_service = get_generation_service()
+        repository = get_exercise_repository()
+        pool_service = get_exercise_pool_service(generation_service, repository)
+
+        pool_status = await pool_service.get_pool_status(session_id, db)
+
+        return {
+            "session_id": session_id,
+            "research_loaded": session.research_context is not None,
+            "initial_exercises_ready": pool_status["total_exercises"] >= 5,
+            "exercise_count": pool_status["total_exercises"],
+            "pending_exercises": pool_status["pending_exercises"],
+            "pool_health": pool_status["pool_health"],
+        }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.exception("Error getting session status")
         raise HTTPException(status_code=500, detail=str(e)) from e
 
 
