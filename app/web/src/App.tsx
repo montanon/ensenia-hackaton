@@ -4,6 +4,7 @@ import { BubbleChatWindow } from './components/bubble/BubbleChatWindow';
 import { LearnPage } from './pages/LearnPage';
 import { PracticePage } from './pages/PracticePage';
 import { ReviewPage } from './pages/ReviewPage';
+import { EvaluacionPage } from './pages/EvaluacionPage';
 import { useNavigationStore } from './stores/navigationStore';
 
 function App() {
@@ -17,6 +18,8 @@ function App() {
         return <PracticePage />;
       case 'review':
         return <ReviewPage />;
+      case 'evaluacion':
+        return <EvaluacionPage />;
       default:
         return <LearnPage />;
     }

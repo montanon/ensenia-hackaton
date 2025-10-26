@@ -32,6 +32,7 @@ export const Sidebar: React.FC = () => {
     { id: 'learn', label: 'Aprender', icon: '📚' },
     { id: 'practice', label: 'Practicar', icon: '✏️' },
     { id: 'review', label: 'Repasar', icon: '📝' },
+    { id: 'evaluacion', label: 'Evaluación', icon: '✅' },
   ];
 
   const handleModeSelect = async (nextMode: SessionMode) => {
