@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useSessionStore } from '../../stores/sessionStore';
 import { useChatStore } from '../../stores/chatStore';
+import { useNavigationStore, type PageType } from '../../stores/navigationStore';
 import { SESSION_MODES } from '../../utils/constants';
 import type { SessionMode } from '../../types/session';
 import { Button } from '../ui/Button';
@@ -22,11 +23,19 @@ export const Sidebar: React.FC = () => {
     addToHistory,
   } = useSessionStore();
   const { clearMessages } = useChatStore();
+  const { currentPage, setCurrentPage } = useNavigationStore();
 
   const [showNewSession, setShowNewSession] = useState(false);
   const [showConfiguration, setShowConfiguration] = useState(false);
   const [isSwitchingMode, setIsSwitchingMode] = useState(false);
   const [modeError, setModeError] = useState<string | null>(null);
+
+  const navigationPages: Array<{ id: PageType; label: string; icon: string }> = [
+    { id: 'learn', label: 'Aprender', icon: '📚' },
+    { id: 'practice', label: 'Practicar', icon: '✏️' },
+    { id: 'review', label: 'Repasar', icon: '📝' },
+    { id: 'evaluacion', label: 'Evaluación', icon: '✅' },
+  ];
 
   const handleModeSelect = async (nextMode: SessionMode) => {
     setMode(nextMode);
@@ -114,6 +123,30 @@ export const Sidebar: React.FC = () => {
           </Button>
         </div>
       )}
+
+      {/* Navigation */}
+      <div className="p-4 border-b border-gray-200">
+        <h4 className="text-sm font-medium text-gray-700 mb-2">Navegación</h4>
+        <div className="space-y-1">
+          {navigationPages.map((page) => (
+            <button
+              key={page.id}
+              onClick={() => setCurrentPage(page.id)}
+              className={cn(
+                'w-full text-left px-3 py-2 rounded-lg text-sm transition-colors',
+                currentPage === page.id
+                  ? 'bg-blue-100 text-blue-900 font-medium'
+                  : 'text-gray-700 hover:bg-gray-100'
+              )}
+            >
+              <div className="flex items-center gap-2">
+                <span>{page.icon}</span>
+                <span>{page.label}</span>
+              </div>
+            </button>
+          ))}
+        </div>
+      </div>
 
       {/* Mode Selector */}
       {currentSession && (
