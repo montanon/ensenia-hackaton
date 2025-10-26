@@ -181,7 +181,7 @@ class ResearchService:
             logger.exception("Error parsing fetch response")
             raise
 
-    async def generate_explanation(
+    async def generate_explanation(  # noqa: PLR0913
         self,
         context: str,
         query: str,
@@ -344,7 +344,7 @@ class ResearchService:
                 # Add snippet of content text
                 snippet = (
                     content.content_text[:200] + "..."
-                    if len(content.content_text) > 200
+                    if len(content.content_text) > 200  # noqa: PLR2004
                     else content.content_text
                 )
                 context_parts.append(f"  Content: {snippet}")

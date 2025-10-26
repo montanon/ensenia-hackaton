@@ -248,7 +248,7 @@ class ChatService:
             raise
 
     async def send_message_streaming(
-        self, session: DBSession, user_message: str, db: AsyncSession
+        self, session: DBSession, user_message: str, db: AsyncSession  # noqa: ARG002
     ) -> object:
         """Send a message and stream AI response chunks.
 

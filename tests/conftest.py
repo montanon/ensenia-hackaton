@@ -40,7 +40,7 @@ async def setup_database():
     await close_db()
 
 
-@pytest.fixture(scope="function", autouse=True)
+@pytest.fixture(autouse=True)
 async def reset_db_engine():
     """Reset the database engine before and after each test.
 
@@ -57,7 +57,7 @@ async def reset_db_engine():
     await engine.dispose()
 
 
-@pytest.fixture(scope="function")
+@pytest.fixture
 async def db_session() -> AsyncGenerator[AsyncSession, None]:
     """Provide a database session for tests.
 
@@ -87,10 +87,10 @@ def mock_settings(monkeypatch):
     """Mock settings for all tests to avoid requiring .env file."""
     mock_settings_obj = MagicMock()
     mock_settings_obj.cloudflare_account_id = "test-account-id"
-    mock_settings_obj.cloudflare_api_token = "test-api-token"
+    mock_settings_obj.cloudflare_api_token = "test-api-token"  # noqa: S105
     mock_settings_obj.cloudflare_r2_bucket = "test-bucket"
     mock_settings_obj.cloudflare_r2_access_key = "test-access-key"
-    mock_settings_obj.cloudflare_r2_secret_key = "test-secret-key"
+    mock_settings_obj.cloudflare_r2_secret_key = "test-secret-key"  # noqa: S105
     mock_settings_obj.cloudflare_r2_endpoint = "https://test.r2.cloudflarestorage.com"
     mock_settings_obj.cloudflare_d1_database_id = "test-db-id"
     mock_settings_obj.cloudflare_vectorize_index = "test-index"
@@ -126,7 +126,7 @@ def mock_settings(monkeypatch):
     mock_settings_obj.environment = "test"
     mock_settings_obj.debug = True
     mock_settings_obj.log_level = "INFO"
-    mock_settings_obj.api_host = "0.0.0.0"
+    mock_settings_obj.api_host = "0.0.0.0"  # noqa: S104
     mock_settings_obj.api_port = 8000
     mock_settings_obj.api_cors_origins = ["http://localhost:3000"]
     mock_settings_obj.cache_default_ttl = 3600

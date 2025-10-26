@@ -452,7 +452,7 @@ class GenerationService:
         self.graph = create_generation_graph()
         logger.info("GenerationService initialized with LangGraph workflow")
 
-    async def generate_exercise(
+    async def generate_exercise(  # noqa: PLR0913
         self,
         exercise_type: ExerciseType,
         grade: int,
