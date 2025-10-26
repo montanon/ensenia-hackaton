@@ -35,6 +35,7 @@ dependencies = [
     "psycopg[binary]>=3.1.0",
     "alembic>=1.13.0",
     "deepgram-sdk>=5.2.0",
+    "pytest>=8.4.2",
 ]
 
 [project.scripts]
@@ -103,6 +104,11 @@ ignore = [
     "PT012",     # Complex pytest.raises blocks (acceptable in tests)
     "ARG002",    # Unused method argument (test fixtures often unused)
     "E501",      # Line too long (test strings can be verbose)
+    "T201",      # Print statements (acceptable in tests for visibility)
+    "ANN002",    # Missing type annotation for *args (test utilities)
+    "BLE001",    # Blind exception handling (acceptable in tests)
+    "ARG001",    # Unused function argument (mock functions)
+    "PLR0915",   # Too many statements (test methods can be long)
 ]
 "alembic/versions/*.py" = [
     "INP001",    # Implicit namespace package (alembic auto-generated)

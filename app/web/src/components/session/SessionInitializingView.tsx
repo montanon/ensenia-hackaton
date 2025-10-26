@@ -33,11 +33,11 @@ export const SessionInitializingView: React.FC = () => {
   }
 
   // Calculate progress percentage
-  const progress = initStatus.research_loaded && initStatus.initial_exercises_ready
-    ? 100
-    : initStatus.research_loaded
-    ? 60 + (Math.min(initStatus.exercise_count, 5) / 5) * 35
-    : 30;
+  const baseProgress = initStatus.research_loaded ? 30 : 10;
+  const exerciseProgress = initStatus.initial_exercises_ready ? 30 : (Math.min(initStatus.exercise_count, 5) / 5) * 30;
+  const contentProgress = initStatus.learning_content_ready ? 20 : 0;
+  const guideProgress = initStatus.study_guide_ready ? 20 : 0;
+  const progress = baseProgress + exerciseProgress + contentProgress + guideProgress;
 
   return (
     <div className="h-full flex flex-col items-center justify-center gap-8 bg-gradient-to-b from-gray-50 to-white p-6">

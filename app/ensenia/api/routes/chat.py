@@ -177,6 +177,10 @@ async def initialize_session_background(
                 session_id,
             )
 
+            exercise_ids = []
+            learning_content = None
+            study_guide = None
+
             try:
                 # Initialize content generation service
                 content_service = ContentGenerationService()
@@ -194,6 +198,9 @@ async def initialize_session_background(
 
                 # Only generate content if we have research context
                 if context:
+                    msg = f"[Background] Context available, generating learning content and study guide for session {session_id}"
+                    logger.info(msg)
+
                     learning_content_task = content_service.generate_learning_content(
                         subject=subject,
                         grade=grade,
@@ -209,38 +216,64 @@ async def initialize_session_background(
                     )
 
                     # Wait for all tasks in parallel
-                    exercise_ids, learning_content, study_guide = await asyncio.gather(
-                        exercise_task,
-                        learning_content_task,
-                        study_guide_task,
-                        return_exceptions=False,
-                    )
+                    try:
+                        (
+                            exercise_ids,
+                            learning_content,
+                            study_guide,
+                        ) = await asyncio.gather(
+                            exercise_task,
+                            learning_content_task,
+                            study_guide_task,
+                            return_exceptions=False,
+                        )
+                        msg = f"[Background] Successfully generated content for session {session_id}: learning_content={'Yes' if learning_content else 'No'}, study_guide={'Yes' if study_guide else 'No'}"
+                        logger.info(msg)
+                    except Exception as e:
+                        msg = f"[Background] Error during parallel content generation for session {session_id}: {str(e)}"
+                        logger.exception(msg)
+                        # Try to get at least exercises if content generation failed
+                        try:
+                            exercise_ids = await exercise_task
+                        except Exception:
+                            msg = f"[Background] Exercise generation also failed for session {session_id}"
+                            logger.exception(msg)
+                            exercise_ids = []
                 else:
                     # If no research context, just generate exercises
+                    msg = f"[Background] No research context, skipping content generation for session {session_id}"
+                    logger.warning(msg)
                     exercise_ids = await exercise_task
                     learning_content = None
                     study_guide = None
 
                 # Update session with generated content
-                stmt = select(DBSession).where(DBSession.id == session_id)
-                result = await db.execute(stmt)
-                session = result.scalar_one()
+                try:
+                    stmt = select(DBSession).where(DBSession.id == session_id)
+                    result = await db.execute(stmt)
+                    session = result.scalar_one()
 
-                session.learning_content = learning_content
-                session.study_guide = study_guide
-                await db.commit()
+                    msg = f"[Background] Updating session {session_id} with content: learning_content={learning_content is not None}, study_guide={study_guide is not None}"
+                    logger.info(msg)
 
-                logger.info(
-                    "[Background] Generated %d exercises and content for session %s",
-                    len(exercise_ids),
-                    session_id,
-                )
+                    session.learning_content = learning_content
+                    session.study_guide = study_guide
+                    await db.commit()
 
-            except Exception:
-                logger.exception(
-                    "[Background] Content/exercise generation failed for session %s",
-                    session_id,
-                )
+                    msg = f"[Background] Successfully saved content to database for session {session_id}"
+                    logger.info(msg)
+
+                except Exception as e:
+                    msg = f"[Background] Failed to save content to database for session {session_id}: {str(e)}"
+                    logger.exception(msg)
+                    await db.rollback()
+
+                msg = f"[Background] Generated {len(exercise_ids)} exercises for session {session_id}"
+                logger.info(msg)
+
+            except Exception as e:
+                msg = f"[Background] Fatal error in content/exercise generation for session {session_id}: {str(e)}"
+                logger.exception(msg)
 
             logger.info("[Background] Session %s initialization complete", session_id)
 
@@ -303,9 +336,7 @@ async def create_session(
         )
         background_tasks.add(task)
         task.add_done_callback(background_tasks.discard)
-        logger.info(
-            "Session %s created, background initialization started", session.id
-        )
+        logger.info("Session %s created, background initialization started", session.id)
         return CreateSessionResponse(
             session_id=session.id,
             grade=session.grade,
