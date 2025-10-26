@@ -177,7 +177,7 @@ async def test_client(db_session):  # noqa: ARG001
 
 
 @pytest.fixture(autouse=True)
-def mock_settings(monkeypatch):
+def mock_settings(monkeypatch):  # noqa: PLR0915
     """Mock settings for all tests to avoid requiring .env file."""
     mock_settings_obj = MagicMock()
     mock_settings_obj.cloudflare_account_id = "test-account-id"
