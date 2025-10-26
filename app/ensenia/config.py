@@ -41,7 +41,7 @@ class Settings(BaseSettings):
     openai_temperature: float = 0.4
 
     # Cloudflare Configuration
-    cloudflare_worker_url: str
+    cloudflare_worker_url: str | None = None
     cloudflare_api_token: str | None = None
 
     # Database Configuration
