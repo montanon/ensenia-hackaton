@@ -8,12 +8,13 @@ Integrates:
 """
 
 import logging
-from collections.abc import AsyncGenerator
+import time
+from collections.abc import AsyncGenerator, Callable
 from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import Any
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 
@@ -64,6 +65,21 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+
+# Performance monitoring middleware
+@app.middleware("http")
+async def add_process_time_header(
+    request: Request, call_next: Callable[[Request], Any]
+) -> Response:
+    """Add X-Process-Time header to all responses showing request duration."""
+    start_time = time.perf_counter()
+    response = await call_next(request)
+    process_time = time.perf_counter() - start_time
+    response.headers["X-Process-Time"] = f"{process_time:.4f}"
+    response.headers["X-Process-Time-Ms"] = f"{process_time * 1000:.2f}"
+    return response
+
 
 # Include routers
 app.include_router(tts.router)
