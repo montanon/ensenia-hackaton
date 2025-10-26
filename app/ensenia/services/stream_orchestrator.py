@@ -69,7 +69,8 @@ async def process_message_with_dual_stream(
         role="user",
         content=user_message,
         timestamp=datetime.now(UTC),
-        output_mode=OutputMode.TEXT.value,  # User messages are always text
+        input_mode=session.input_mode,  # Track how user sent this message
+        output_mode=OutputMode.TEXT.value,  # User messages are always stored as text
     )
     db.add(user_msg)
     try:
