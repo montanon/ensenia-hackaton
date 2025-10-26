@@ -11,12 +11,13 @@ Endpoints:
 import logging
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.ensenia.database.models import Exercise as DBExercise
 from app.ensenia.database.session import get_db
 from app.ensenia.schemas.exercises import (
+    DifficultyLevel,
     EssayContent,
     ExerciseListResponse,
     ExerciseResponse,
@@ -190,11 +191,18 @@ async def generate_exercise(
         ) from e
 
 
-@router.post("/search")
+@router.get("")
 async def search_exercises(
-    request: SearchExercisesRequest,
     db: Annotated[AsyncSession, Depends(get_db)],
     repository: Annotated[ExerciseRepository, Depends(get_exercise_repository)],
+    grade: int | None = Query(None, ge=1, le=12, description="Grade level filter"),
+    subject: str | None = Query(None, max_length=100, description="Subject filter"),
+    topic: str | None = Query(None, max_length=200, description="Topic filter"),
+    exercise_type: ExerciseType | None = Query(None, description="Exercise type filter"),
+    difficulty_level: DifficultyLevel | None = Query(
+        None, description="Difficulty level filter"
+    ),
+    limit: int = Query(10, ge=1, le=100, description="Maximum number of results"),
 ) -> ExerciseListResponse:
     """Search for existing reusable exercises.
 
@@ -203,7 +211,12 @@ async def search_exercises(
     instead of generating new ones.
 
     Args:
-        request: Search filters
+        grade: Grade level filter (1-12)
+        subject: Subject filter
+        topic: Topic filter
+        exercise_type: Exercise type filter
+        difficulty_level: Difficulty level filter
+        limit: Maximum number of results
         db: Database session
         repository: Exercise repository
 
@@ -215,17 +228,25 @@ async def search_exercises(
 
     """
     try:
-        msg = f"Searching exercises with filters: {request.model_dump()}"
+        filters = {
+            "grade": grade,
+            "subject": subject,
+            "topic": topic,
+            "exercise_type": exercise_type,
+            "difficulty_level": difficulty_level,
+            "limit": limit,
+        }
+        msg = f"Searching exercises with filters: {filters}"
         logger.info(msg)
 
         exercises = await repository.search_exercises(
             db,
-            grade=request.grade,
-            subject=request.subject,
-            topic=request.topic,
-            exercise_type=request.exercise_type,
-            difficulty_level=request.difficulty_level,
-            limit=request.limit,
+            grade=grade,
+            subject=subject,
+            topic=topic,
+            exercise_type=exercise_type,
+            difficulty_level=difficulty_level,
+            limit=limit,
         )
 
         # Convert to responses
