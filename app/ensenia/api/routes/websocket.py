@@ -18,7 +18,7 @@ from fastapi import APIRouter, Depends, WebSocket, WebSocketDisconnect
 from fastapi.websockets import WebSocketState
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.ensenia.database.models import OutputMode
+from app.ensenia.database.models import InputMode, OutputMode
 from app.ensenia.database.session import get_db
 from app.ensenia.services.chat_service import ChatService
 from app.ensenia.services.deepgram_service import get_deepgram_service
@@ -45,7 +45,10 @@ async def websocket_chat_endpoint(  # noqa: C901, PLR0912, PLR0915
 
     Message Types (Client -> Server):
         - {type: "message", content: "text"} - Send chat message
-        - {type: "set_mode", mode: "text"|"audio"} - Switch output mode (text or audio)
+        - {type: "set_mode", mode: "text"|"audio"} - Switch output mode (text or audio) [deprecated: use set_output_mode]
+        - {type: "set_output_mode", mode: "text"|"audio"} - Switch how agent responds (text or audio)
+        - {type: "set_input_mode", mode: "text"|"voice"} - Switch how user sends messages (text or voice)
+        - {type: "toggle_voice"} - Toggle both input/output modes to full voice or full text
         - {type: "audio_chunk", data: "base64_audio"} - Send audio chunk for STT
         - {type: "audio_end"} - Signal end of audio, triggers Deepgram transcription
         - {type: "ping"} - Keep-alive ping
@@ -106,7 +109,8 @@ async def websocket_chat_endpoint(  # noqa: C901, PLR0912, PLR0915
         {
             "type": "connected",
             "session_id": session_id,
-            "current_mode": session.current_mode,
+            "input_mode": session.input_mode,
+            "output_mode": session.current_mode,
             "grade": session.grade,
             "subject": session.subject,
             "mode": session.mode,
@@ -134,32 +138,111 @@ async def websocket_chat_endpoint(  # noqa: C901, PLR0912, PLR0915
             if message_type == "ping":
                 await connection_manager.send_message(session_id, {"type": "pong"})
 
-            elif message_type == "set_mode":
-                # Handle mode switching
+            elif message_type == "set_mode" or message_type == "set_output_mode":
+                # Handle output mode switching (text/audio)
                 new_mode = message_data.get("mode")
-                msg = f"[WebSocket] Mode change requested for session {session_id}: {new_mode}"
+                msg = f"[WebSocket] Output mode change requested for session {session_id}: {new_mode}"
                 logger.info(msg)
 
                 if new_mode not in [OutputMode.TEXT.value, OutputMode.AUDIO.value]:
-                    msg = f"[WebSocket] Invalid mode received: {new_mode}"
+                    msg = f"[WebSocket] Invalid output mode received: {new_mode}"
                     logger.error(msg)
                     await connection_manager.send_error(
                         session_id,
-                        f"Invalid mode: {new_mode}. Must be 'text' or 'audio'",
-                        "INVALID_MODE",
+                        f"Invalid output mode: {new_mode}. Must be 'text' or 'audio'",
+                        "INVALID_OUTPUT_MODE",
                     )
                     continue
 
                 try:
-                    await chat_service.update_session_mode(session_id, new_mode, db)
-                    await connection_manager.send_mode_changed(session_id, new_mode)
-                    msg = f"[WebSocket] Session {session_id} mode successfully changed to {new_mode}"
+                    await chat_service.update_session_output_mode(
+                        session_id, new_mode, db
+                    )
+                    await connection_manager.send_output_mode_changed(
+                        session_id, new_mode
+                    )
+                    msg = f"[WebSocket] Session {session_id} output mode successfully changed to {new_mode}"
                     logger.info(msg)
                 except Exception:
-                    msg = f"[WebSocket] Failed to update session {session_id} mode to {new_mode}"
+                    msg = f"[WebSocket] Failed to update session {session_id} output mode to {new_mode}"
                     logger.exception(msg)
                     await connection_manager.send_error(
-                        session_id, msg, "MODE_UPDATE_FAILED"
+                        session_id, msg, "OUTPUT_MODE_UPDATE_FAILED"
+                    )
+
+            elif message_type == "set_input_mode":
+                # Handle input mode switching (text/voice)
+                new_mode = message_data.get("mode")
+                msg = f"[WebSocket] Input mode change requested for session {session_id}: {new_mode}"
+                logger.info(msg)
+
+                if new_mode not in [InputMode.TEXT.value, InputMode.VOICE.value]:
+                    msg = f"[WebSocket] Invalid input mode received: {new_mode}"
+                    logger.error(msg)
+                    await connection_manager.send_error(
+                        session_id,
+                        f"Invalid input mode: {new_mode}. Must be 'text' or 'voice'",
+                        "INVALID_INPUT_MODE",
+                    )
+                    continue
+
+                try:
+                    await chat_service.update_session_input_mode(
+                        session_id, new_mode, db
+                    )
+                    await connection_manager.send_input_mode_changed(
+                        session_id, new_mode
+                    )
+                    msg = f"[WebSocket] Session {session_id} input mode successfully changed to {new_mode}"
+                    logger.info(msg)
+                except Exception:
+                    msg = f"[WebSocket] Failed to update session {session_id} input mode to {new_mode}"
+                    logger.exception(msg)
+                    await connection_manager.send_error(
+                        session_id, msg, "INPUT_MODE_UPDATE_FAILED"
+                    )
+
+            elif message_type == "toggle_voice":
+                # Handle full voice mode toggle
+                msg = f"[WebSocket] Voice toggle requested for session {session_id}"
+                logger.info(msg)
+
+                try:
+                    # Check current state - toggle to full voice or full text
+                    current_input = session.input_mode
+                    current_output = session.current_mode
+
+                    # If in text mode, switch to voice. Otherwise, switch back to text.
+                    if current_input == InputMode.TEXT.value:
+                        new_input = InputMode.VOICE.value
+                        new_output = OutputMode.AUDIO.value
+                    else:
+                        new_input = InputMode.TEXT.value
+                        new_output = OutputMode.TEXT.value
+
+                    # Update both modes
+                    await chat_service.update_session_input_mode(
+                        session_id, new_input, db
+                    )
+                    await chat_service.update_session_output_mode(
+                        session_id, new_output, db
+                    )
+
+                    # Notify client of both changes
+                    await connection_manager.send_input_mode_changed(
+                        session_id, new_input
+                    )
+                    await connection_manager.send_output_mode_changed(
+                        session_id, new_output
+                    )
+
+                    msg = f"[WebSocket] Session {session_id} toggled voice mode (input: {new_input}, output: {new_output})"
+                    logger.info(msg)
+                except Exception:
+                    msg = f"[WebSocket] Failed to toggle voice mode for session {session_id}"
+                    logger.exception(msg)
+                    await connection_manager.send_error(
+                        session_id, msg, "VOICE_TOGGLE_FAILED"
                     )
 
             elif message_type == "audio_chunk":
