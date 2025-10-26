@@ -59,10 +59,22 @@ export const NewSessionDialog: React.FC<NewSessionDialogProps> = ({ isOpen, onCl
           research_loaded: status.research_loaded,
           initial_exercises_ready: status.initial_exercises_ready,
           exercise_count: status.exercise_count,
+          learning_content_ready: status.learning_content_ready,
+          study_guide_ready: status.study_guide_ready,
+          pending_exercises: status.pending_exercises,
+          pool_health: status.pool_health,
         });
 
         // Check if initialization is complete
-        if ((status.research_loaded && status.initial_exercises_ready) || pollCount >= 3) {
+        // Wait for all critical components OR timeout after maximum polls
+        const allComponentsReady = status.research_loaded && 
+                                   status.initial_exercises_ready && 
+                                   status.learning_content_ready && 
+                                   status.study_guide_ready;
+        
+        const minComponentsReady = status.research_loaded && status.initial_exercises_ready;
+        
+        if (allComponentsReady || (minComponentsReady && pollCount >= MAX_POLLS)) {
           if (!isComplete) {
             isComplete = true;
             setInitializing(false);
@@ -73,6 +85,14 @@ export const NewSessionDialog: React.FC<NewSessionDialogProps> = ({ isOpen, onCl
               await loadExercisePool(sessionId);
             } catch (err) {
               console.error('Error loading exercise pool:', err);
+            }
+            
+            // Log warning if content wasn't ready
+            if (!allComponentsReady) {
+              console.warn('Session initialized but some content is not ready:', {
+                learning_content_ready: status.learning_content_ready,
+                study_guide_ready: status.study_guide_ready
+              });
             }
           }
         }
@@ -120,6 +140,9 @@ export const NewSessionDialog: React.FC<NewSessionDialogProps> = ({ isOpen, onCl
         research_loaded: false,
         initial_exercises_ready: false,
         exercise_count: 0,
+        learning_content_ready: false,
+        study_guide_ready: false,
+        pending_exercises: 0,
       });
       setInitError(null);
 
