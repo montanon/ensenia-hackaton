@@ -57,7 +57,7 @@ class TestInputModeEnum:
 
     def test_input_mode_invalid_value(self):
         """Test InputMode raises error for invalid value."""
-        with pytest.raises(ValueError):
+        with pytest.raises(ValueError, match="is not a valid InputMode"):
             InputMode("invalid")
 
 
@@ -91,7 +91,7 @@ class TestOutputModeEnum:
 
     def test_output_mode_invalid_value(self):
         """Test OutputMode raises error for invalid value."""
-        with pytest.raises(ValueError):
+        with pytest.raises(ValueError, match="is not a valid OutputMode"):
             OutputMode("invalid")
 
 
@@ -272,7 +272,6 @@ class TestSessionMessageRelationship:
 
     def test_message_references_session(self):
         """Test Message references Session."""
-        session = Session(grade=5, subject="mathematics", mode="learn")
         message = Message(
             session_id=1, role="user", content="Hello", timestamp=datetime.now(UTC)
         )
