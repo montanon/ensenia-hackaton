@@ -52,6 +52,9 @@ class Settings(BaseSettings):
     elevenlabs_voice_id: str = "pNInz6obpgDQGcFmaJgB"  # Dorothy - Chilean Spanish
     elevenlabs_model_id: str = "eleven_turbo_v2_5"
 
+    # DeepGram Speech-to-Text
+    deepgram_api_key: str = ""
+
     # Audio Configuration
     audio_format: str = "mp3_44100_128"
 
@@ -73,6 +76,16 @@ class Settings(BaseSettings):
     openai_model: str = "gpt-4-turbo-preview"
     openai_max_tokens: int = 2000
     openai_temperature: float = 0.4
+
+    # Speech-to-Text Configuration
+    stt_provider: str = "deepgram"  # "deepgram" or "whisper"
+    stt_language: str = "es"  # Chilean Spanish
+
+    # OpenAI Whisper (Speech-to-Text) - Fallback
+    stt_model: str = "whisper-1"
+
+    # Deepgram (Streaming Speech-to-Text)
+    deepgram_api_key: str = ""
 
     # Exercise Generation Settings
     generation_max_iterations: int = (
