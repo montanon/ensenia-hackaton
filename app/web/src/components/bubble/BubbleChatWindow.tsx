@@ -144,8 +144,8 @@ export const BubbleChatWindow: React.FC = () => {
     };
   }, [isResizing]);
 
-  // Don't render chat window if no session or still initializing
-  if (!currentSession || isInitializing) {
+  // Don't render chat window if no session
+  if (!currentSession) {
     return null;
   }
 
@@ -153,16 +153,17 @@ export const BubbleChatWindow: React.FC = () => {
     <div
       ref={resizeRef}
       className={cn(
-        'h-screen z-40 flex-shrink-0',
+        'h-screen z-40 flex-shrink-0 overflow-hidden',
         isChatOpen ? 'bubble-chat-panel-open' : 'bubble-chat-panel'
       )}
       style={{
         width: isChatOpen ? `${panelWidth}px` : '0px',
+        minWidth: isChatOpen ? `${panelWidth}px` : '0px',
       }}
     >
       <div
         className="h-full bg-white shadow-[-20px_0_60px_-15px_rgba(59,130,246,0.5)] border-l border-blue-100 flex flex-col overflow-hidden backdrop-blur-sm relative"
-        style={{ width: `${panelWidth}px` }}
+        style={{ width: `${panelWidth}px`, minWidth: `${panelWidth}px` }}
       >
         {/* Resize Handle - Left Edge */}
         <div

@@ -15,7 +15,7 @@ export const Sidebar: React.FC = () => {
     setMode,
     setCurrentSession,
   } = useSessionStore();
-  const { currentPage, setCurrentPage } = useNavigationStore();
+  const { setCurrentPage } = useNavigationStore();
 
   const [showNewSession, setShowNewSession] = useState(false);
   const [showConfiguration, setShowConfiguration] = useState(false);
@@ -79,29 +79,63 @@ export const Sidebar: React.FC = () => {
         <div className="p-4 border-b border-gray-200">
           <h4 className="text-sm font-medium text-gray-700 mb-2">Modo de Aprendizaje</h4>
           <div className="space-y-1">
-            {SESSION_MODES.map((sessionMode) => (
-              <button
-                key={sessionMode.value}
-                onClick={() => {
-                  handleModeSelect(sessionMode.value as SessionMode);
-                  setCurrentPage(sessionMode.value as PageType);
-                }}
-                className={cn(
-                  'w-full text-left px-3 py-2 rounded-lg text-sm transition-colors',
-                  mode === sessionMode.value
-                    ? 'bg-blue-100 text-blue-900 font-medium'
-                    : 'text-gray-700 hover:bg-gray-100'
-                )}
-              >
-                <div className="flex items-center gap-2">
-                  <span>{sessionMode.icon}</span>
-                  <div>
-                    <div className="font-medium">{sessionMode.label}</div>
-                    <div className="text-xs opacity-75">{sessionMode.description}</div>
+            {SESSION_MODES.map((sessionMode) => {
+              // Render icon based on mode
+              const renderIcon = () => {
+                switch (sessionMode.value) {
+                  case 'learn':
+                    return (
+                      <svg className="w-5 h-5 text-blue-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                      </svg>
+                    );
+                  case 'practice':
+                    return (
+                      <svg className="w-5 h-5 text-blue-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01" />
+                      </svg>
+                    );
+                  case 'study':
+                    return (
+                      <svg className="w-5 h-5 text-blue-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6.253v13m0-13C6.5 6.253 2 10.998 2 17s4.5 10.747 10 10.747c5.5 0 10-4.998 10-10.747S17.5 6.253 12 6.253z" />
+                      </svg>
+                    );
+                  case 'evaluation':
+                    return (
+                      <svg className="w-5 h-5 text-blue-500" fill="currentColor" viewBox="0 0 20 20">
+                        <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.381-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
+                      </svg>
+                    );
+                  default:
+                    return null;
+                }
+              };
+
+              return (
+                <button
+                  key={sessionMode.value}
+                  onClick={() => {
+                    handleModeSelect(sessionMode.value as SessionMode);
+                    setCurrentPage(sessionMode.value as PageType);
+                  }}
+                  className={cn(
+                    'w-full text-left px-3 py-2 rounded-lg text-sm transition-colors',
+                    mode === sessionMode.value
+                      ? 'bg-blue-100 text-blue-900 font-medium'
+                      : 'text-gray-700 hover:bg-gray-100'
+                  )}
+                >
+                  <div className="flex items-center gap-2">
+                    {renderIcon()}
+                    <div>
+                      <div className="font-medium">{sessionMode.label}</div>
+                      <div className="text-xs opacity-75">{sessionMode.description}</div>
+                    </div>
                   </div>
-                </div>
-              </button>
-            ))}
+                </button>
+              );
+            })}
           </div>
         </div>
       )}

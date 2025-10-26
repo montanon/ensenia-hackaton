@@ -1,6 +1,5 @@
 import React, { useState, type KeyboardEvent } from 'react';
 import { useSessionStore } from '../../stores/sessionStore';
-import { Button } from '../ui/Button';
 import { VoiceButton } from './VoiceButton';
 
 interface ChatInputProps {

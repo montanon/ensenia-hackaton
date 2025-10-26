@@ -13,7 +13,7 @@ export const BubbleAssistant: React.FC = () => {
   const { isSpeaking } = useAudioStore();
   const { currentSession, isInitializing, setInputMode, setOutputMode } = useSessionStore();
   const [transcript, setTranscript] = useState('');
-  const holdTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const holdTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const isHoldingRef = useRef(false);
 
   // Auto-switch modes based on chat state

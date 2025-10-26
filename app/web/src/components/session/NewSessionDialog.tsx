@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { Dialog } from '@headlessui/react';
 import { Button } from '../ui/Button';
 import { Input } from '../ui/Input';
@@ -8,6 +8,7 @@ import { sessionApi } from '../../services/api';
 import { useSessionStore } from '../../stores/sessionStore';
 import { useChatStore } from '../../stores/chatStore';
 import { useExerciseStore } from '../../stores/exerciseStore';
+import { useBubbleStore } from '../../stores/bubbleStore';
 
 const MAX_POLLS = 60; // 60 polls × 2 seconds = 2 minutes max
 
@@ -34,10 +35,12 @@ export const NewSessionDialog: React.FC<NewSessionDialogProps> = ({ isOpen, onCl
   } = useSessionStore();
   const { clearMessages } = useChatStore();
   const { loadExercisePool } = useExerciseStore();
+  const { closeChat } = useBubbleStore();
 
   // Polling for session initialization status with timeout protection
   const pollSessionStatus = async (sessionId: number) => {
     let pollCount = 0;
+    let isComplete = false;
 
     const pollInterval = setInterval(async () => {
       pollCount++;
@@ -59,12 +62,19 @@ export const NewSessionDialog: React.FC<NewSessionDialogProps> = ({ isOpen, onCl
         });
 
         // Check if initialization is complete
-        if (status.research_loaded && status.initial_exercises_ready) {
-          setInitializing(false);
-          clearInterval(pollInterval);
+        if ((status.research_loaded && status.initial_exercises_ready) || pollCount >= 3) {
+          if (!isComplete) {
+            isComplete = true;
+            setInitializing(false);
+            clearInterval(pollInterval);
 
-          // Load exercise pool
-          await loadExercisePool(sessionId);
+            // Load exercise pool
+            try {
+              await loadExercisePool(sessionId);
+            } catch (err) {
+              console.error('Error loading exercise pool:', err);
+            }
+          }
         }
       } catch (err) {
         console.error('Error polling session status:', err);
@@ -100,6 +110,9 @@ export const NewSessionDialog: React.FC<NewSessionDialogProps> = ({ isOpen, onCl
       addToHistory(session);
       setSessionMode(mode);
       clearMessages();
+
+      // Close chat panel (only opens when user clicks bubble)
+      closeChat();
 
       // Start polling for initialization in the background
       setInitializing(true);
@@ -192,7 +205,29 @@ export const NewSessionDialog: React.FC<NewSessionDialogProps> = ({ isOpen, onCl
                         : 'border-gray-200 hover:border-gray-300'
                     }`}
                   >
-                    <div className="text-xl mb-1">{sessionMode.icon}</div>
+                    {/* Icon based on mode */}
+                    <div className="w-6 h-6 mb-2 text-blue-500">
+                      {sessionMode.value === 'learn' && (
+                        <svg fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6.253v13m0-13C6.5 6.253 2 10.998 2 17s4.5 10.747 10 10.747c5.5 0 10-4.998 10-10.747S17.5 6.253 12 6.253z" />
+                        </svg>
+                      )}
+                      {sessionMode.value === 'practice' && (
+                        <svg fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 4a2 2 0 114 0V0h3a2 2 0 012 2v14a2 2 0 01-2 2H7a2 2 0 01-2-2V2a2 2 0 012-2h3V4zm.5 2h3v6h-3V6z" />
+                        </svg>
+                      )}
+                      {sessionMode.value === 'study' && (
+                        <svg fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                        </svg>
+                      )}
+                      {sessionMode.value === 'evaluation' && (
+                        <svg fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+                        </svg>
+                      )}
+                    </div>
                     <div className="text-sm font-medium">{sessionMode.label}</div>
                   </button>
                 ))}

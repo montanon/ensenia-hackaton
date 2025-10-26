@@ -233,8 +233,23 @@ export const ChatTab: React.FC = () => {
           </div>
 
           <div className="text-sm">
-            <span className="px-3 py-1 bg-gray-100 rounded-full text-gray-700">
-              {outputMode === 'voice' ? '🔊 Audio' : '📖 Texto'}
+            <span className="px-3 py-1 bg-gray-100 rounded-full text-gray-700 flex items-center gap-2">
+              {outputMode === 'voice' ? (
+                <>
+                  <svg className="w-4 h-4 text-blue-500" fill="currentColor" viewBox="0 0 20 20">
+                    <path d="M8 16.5a1.5 1.5 0 11-3 0 1.5 1.5 0 013 0zM15 16.5a1.5 1.5 0 11-3 0 1.5 1.5 0 013 0z" />
+                    <path d="M3 4a1 1 0 00-1 1v10a1 1 0 001 1h12a1 1 0 001-1V5a1 1 0 00-1-1H3zM14.707 6.293a1 1 0 00-1.414 1.414l1.414-1.414zM1.5 9a.5.5 0 100-1 .5.5 0 000 1z" />
+                  </svg>
+                  Audio
+                </>
+              ) : (
+                <>
+                  <svg className="w-4 h-4 text-blue-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6.253v13m0-13C6.5 6.253 2 10.998 2 17s4.5 10.747 10 10.747c5.5 0 10-4.998 10-10.747S17.5 6.253 12 6.253z" />
+                  </svg>
+                  Texto
+                </>
+              )}
             </span>
           </div>
         </div>
@@ -244,7 +259,9 @@ export const ChatTab: React.FC = () => {
       {error && (
         <div className="px-6 py-3 bg-red-50 border-b border-red-200 flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <span className="text-red-600">⚠️</span>
+            <svg className="w-5 h-5 text-red-600" fill="currentColor" viewBox="0 0 20 20">
+              <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+            </svg>
             <p className="text-sm text-red-800">{error}</p>
           </div>
           <button
@@ -265,7 +282,22 @@ export const ChatTab: React.FC = () => {
             variant="primary"
             size="sm"
           >
-            {isGenerating ? '⏳ Generando ejercicio...' : '✏️ Generar Ejercicio'}
+            {isGenerating ? (
+              <>
+                <svg className="inline-block w-4 h-4 mr-2 animate-spin" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                </svg>
+                Generando ejercicio...
+              </>
+            ) : (
+              <>
+                <svg className="inline-block w-4 h-4 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 4a2 2 0 114 0V0h3a2 2 0 012 2v14a2 2 0 01-2 2H7a2 2 0 01-2-2V2a2 2 0 012-2h3V4zm.5 2h3v6h-3V6z" />
+                </svg>
+                Generar Ejercicio
+              </>
+            )}
           </Button>
         </div>
       )}

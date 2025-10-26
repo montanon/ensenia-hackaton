@@ -1,5 +1,5 @@
 import { useEffect } from 'react';
-import { AppLayout } from './components/layout/AppLayout';
+import { Sidebar } from './components/layout/Sidebar';
 import { BubbleAssistant } from './components/bubble/BubbleAssistant';
 import { BubbleChatWindow } from './components/bubble/BubbleChatWindow';
 import { LearnPage } from './pages/LearnPage';
@@ -10,15 +10,31 @@ import { LandingPage } from './pages/LandingPage';
 import { LoginPage } from './pages/LoginPage';
 import { useNavigationStore } from './stores/navigationStore';
 import { useAuthStore } from './stores/authStore';
+import { useSessionStore } from './stores/sessionStore';
 
 function App() {
   const { currentPage, setCurrentPage } = useNavigationStore();
   const { isAuthenticated, initializeAuth } = useAuthStore();
+  const { clearSession } = useSessionStore();
 
-  // Initialize auth state from localStorage on app load
+  // Initialize app state on load
   useEffect(() => {
+    // Initialize auth from localStorage
     initializeAuth();
-  }, [initializeAuth]);
+
+    // Check if user has valid auth token
+    const hasAuthToken = !!localStorage.getItem('authToken');
+
+    // Clear any stale session data and navigate to valid initial state
+    clearSession();
+
+    // Set initial page based on auth status
+    if (hasAuthToken) {
+      setCurrentPage('learn');
+    } else {
+      setCurrentPage('landing');
+    }
+  }, []);
 
   // Reset page to landing if user logs out
   useEffect(() => {
@@ -57,16 +73,20 @@ function App() {
     }
   };
 
-  // For authenticated users, show full app layout
+  // For authenticated users, show full app layout with sidebar
   if (isAuthenticated && (currentPage === 'learn' || currentPage === 'practice' || currentPage === 'review' || currentPage === 'evaluacion')) {
     return (
       <div className="flex h-screen overflow-hidden">
-        <div className="flex-1 overflow-auto relative">
-          <AppLayout>
-            {renderPage()}
-          </AppLayout>
+        {/* Sidebar - always visible */}
+        <Sidebar />
+
+        {/* Main content area */}
+        <main className="flex-1 overflow-hidden flex flex-col relative">
+          {renderPage()}
           <BubbleAssistant />
-        </div>
+        </main>
+
+        {/* Chat panel */}
         <BubbleChatWindow />
       </div>
     );
