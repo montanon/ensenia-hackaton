@@ -14,22 +14,20 @@ from app.ensenia.services.elevenlabs_service import (
 @pytest.fixture
 def mock_settings():
     """Mock settings."""
-    with patch("app.ensenia.services.elevenlabs_service.get_settings") as mock:
-        settings = Mock()
-        settings.elevenlabs_api_key = "test-key"
-        settings.cache_dir = "./test_cache"
-        settings.cache_ttl_hours = 24
-        settings.elevenlabs_voice_id = "test-voice"
-        settings.elevenlabs_model_id = "test-model"
-        settings.audio_format = "mp3_44100_128"
-        settings.voice_stability_elementary = 0.70
-        settings.voice_stability_middle = 0.65
-        settings.voice_stability_high = 0.60
-        settings.voice_speed_elementary = 0.85
-        settings.voice_speed_middle = 0.95
-        settings.voice_speed_high = 1.00
-        mock.return_value = settings
-        yield settings
+    with patch("app.ensenia.services.elevenlabs_service.settings") as mock:
+        mock.elevenlabs_api_key = "test-key"
+        mock.cache_dir = "./test_cache"
+        mock.cache_ttl_hours = 24
+        mock.elevenlabs_voice_id = "test-voice"
+        mock.elevenlabs_model_id = "test-model"
+        mock.audio_format = "mp3_44100_128"
+        mock.voice_stability_elementary = 0.70
+        mock.voice_stability_middle = 0.65
+        mock.voice_stability_high = 0.60
+        mock.voice_speed_elementary = 0.85
+        mock.voice_speed_middle = 0.95
+        mock.voice_speed_high = 1.00
+        yield mock
 
 
 @pytest.fixture
