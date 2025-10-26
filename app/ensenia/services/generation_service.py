@@ -346,6 +346,7 @@ Proporciona tu evaluación en el siguiente formato JSON:
             logger.error(msg)
             validation_result = {
                 "score": 5,
+                "breakdown": {},
                 "feedback": "Validation failed",
                 "recommendation": "REVISAR",
             }
@@ -354,6 +355,7 @@ Proporciona tu evaluación en el siguiente formato JSON:
         logger.exception(msg)
         validation_result = {
             "score": 5,
+            "breakdown": {},
             "feedback": "Invalid validation format",
             "recommendation": "REVISAR",
         }
@@ -361,13 +363,16 @@ Proporciona tu evaluación en el siguiente formato JSON:
     score = validation_result.get("score", 0)
     feedback = validation_result.get("feedback", "No feedback provided")
     recommendation = validation_result.get("recommendation", "REVISAR")
+    breakdown = validation_result.get("breakdown", {})
 
     is_approved = score >= state.quality_threshold or recommendation == "APROBAR"
 
     # Record in validation history
     validation_record = ValidationResult(
         score=score,
+        breakdown=breakdown,
         feedback=feedback,
+        recommendation=recommendation,
         is_approved=is_approved,
         iteration=state.iteration_count,
     )
