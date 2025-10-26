@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Dialog } from '@headlessui/react';
 import { Button } from '../ui/Button';
 import { Input } from '../ui/Input';
@@ -7,6 +7,7 @@ import type { SessionMode } from '../../types/session';
 import { sessionApi } from '../../services/api';
 import { useSessionStore } from '../../stores/sessionStore';
 import { useChatStore } from '../../stores/chatStore';
+import { useExerciseStore } from '../../stores/exerciseStore';
 
 interface NewSessionDialogProps {
   isOpen: boolean;
@@ -21,8 +22,59 @@ export const NewSessionDialog: React.FC<NewSessionDialogProps> = ({ isOpen, onCl
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
+  // Initialization tracking
+  const [createdSessionId, setCreatedSessionId] = useState<number | null>(null);
+  const [isInitializing, setIsInitializing] = useState(false);
+  const [initStatus, setInitStatus] = useState({
+    research_loaded: false,
+    initial_exercises_ready: false,
+    exercise_count: 0,
+  });
+
   const { setCurrentSession, addToHistory, setMode: setSessionMode } = useSessionStore();
   const { clearMessages } = useChatStore();
+  const { loadExercisePool } = useExerciseStore();
+
+  // Poll for session initialization status
+  useEffect(() => {
+    if (!createdSessionId || !isInitializing) return;
+
+    const pollInterval = setInterval(async () => {
+      try {
+        const status = await sessionApi.getStatus(createdSessionId);
+        setInitStatus({
+          research_loaded: status.research_loaded,
+          initial_exercises_ready: status.initial_exercises_ready,
+          exercise_count: status.exercise_count,
+        });
+
+        // Check if initialization is complete
+        if (status.research_loaded && status.initial_exercises_ready) {
+          setIsInitializing(false);
+          clearInterval(pollInterval);
+
+          // Load exercise pool
+          await loadExercisePool(createdSessionId);
+
+          // Close dialog after short delay
+          setTimeout(() => {
+            onClose();
+            // Reset state
+            setCreatedSessionId(null);
+            setInitStatus({
+              research_loaded: false,
+              initial_exercises_ready: false,
+              exercise_count: 0,
+            });
+          }, 500);
+        }
+      } catch (err) {
+        console.error('Error polling session status:', err);
+      }
+    }, 2000); // Poll every 2 seconds
+
+    return () => clearInterval(pollInterval);
+  }, [createdSessionId, isInitializing, loadExercisePool, onClose]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -44,7 +96,7 @@ export const NewSessionDialog: React.FC<NewSessionDialogProps> = ({ isOpen, onCl
         mode: response.mode,
         created_at: response.created_at,
         current_mode: 'text' as const,
-        research_context: response.context_loaded ? topic : undefined,
+        research_context: undefined, // Will be loaded in background
       };
 
       setCurrentSession(session);
@@ -52,10 +104,12 @@ export const NewSessionDialog: React.FC<NewSessionDialogProps> = ({ isOpen, onCl
       setSessionMode(mode);
       clearMessages();
 
-      onClose();
+      // Start polling for initialization
+      setCreatedSessionId(response.session_id);
+      setIsInitializing(true);
+      setLoading(false);
     } catch (err: any) {
       setError(err.response?.data?.message || 'Error al crear la sesión');
-    } finally {
       setLoading(false);
     }
   };
@@ -145,13 +199,42 @@ export const NewSessionDialog: React.FC<NewSessionDialogProps> = ({ isOpen, onCl
               </div>
             )}
 
+            {/* Initialization Progress */}
+            {isInitializing && (
+              <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg space-y-3">
+                <div className="flex items-center gap-2 text-sm font-medium text-blue-900">
+                  <svg className="animate-spin h-4 w-4" fill="none" viewBox="0 0 24 24">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                  </svg>
+                  Inicializando sesión...
+                </div>
+
+                <div className="space-y-2 text-sm">
+                  <div className="flex items-center justify-between">
+                    <span className="text-gray-700">🔍 Investigación curricular</span>
+                    <span className={`text-xs font-medium ${initStatus.research_loaded ? 'text-green-600' : 'text-gray-500'}`}>
+                      {initStatus.research_loaded ? '✓ Completado' : 'En progreso...'}
+                    </span>
+                  </div>
+
+                  <div className="flex items-center justify-between">
+                    <span className="text-gray-700">📝 Generando ejercicios</span>
+                    <span className={`text-xs font-medium ${initStatus.initial_exercises_ready ? 'text-green-600' : 'text-gray-500'}`}>
+                      {initStatus.initial_exercises_ready ? `✓ ${initStatus.exercise_count} listos` : `${initStatus.exercise_count}/5...`}
+                    </span>
+                  </div>
+                </div>
+              </div>
+            )}
+
             <div className="flex gap-2 pt-2">
               <Button
                 type="button"
                 variant="ghost"
                 onClick={onClose}
                 className="flex-1"
-                disabled={loading}
+                disabled={loading || isInitializing}
               >
                 Cancelar
               </Button>
@@ -159,9 +242,9 @@ export const NewSessionDialog: React.FC<NewSessionDialogProps> = ({ isOpen, onCl
                 type="submit"
                 variant="primary"
                 className="flex-1"
-                disabled={loading}
+                disabled={loading || isInitializing}
               >
-                {loading ? 'Creando...' : 'Crear Sesión'}
+                {loading ? 'Creando...' : isInitializing ? 'Inicializando...' : 'Crear Sesión'}
               </Button>
             </div>
           </form>

@@ -46,6 +46,18 @@ export const sessionApi = {
   updateMode: async (sessionId: number, mode: string): Promise<void> => {
     await api.patch(`/chat/sessions/${sessionId}/mode`, { mode });
   },
+
+  getStatus: async (sessionId: number): Promise<{
+    session_id: number;
+    research_loaded: boolean;
+    initial_exercises_ready: boolean;
+    exercise_count: number;
+    pending_exercises: number;
+    pool_health: string;
+  }> => {
+    const response = await api.get(`/chat/sessions/${sessionId}/status`);
+    return response.data;
+  },
 };
 
 // Exercise API
@@ -68,6 +80,11 @@ export const exerciseApi = {
   submit: async (exerciseSessionId: number, data: SubmitAnswerRequest): Promise<SubmitAnswerResponse> => {
     const response = await api.post<SubmitAnswerResponse>(`/exercises/sessions/${exerciseSessionId}/submit`, data);
     return response.data;
+  },
+
+  getSessionExercises: async (sessionId: number): Promise<Exercise[]> => {
+    const response = await api.get<{ exercises: Exercise[]; total: number }>(`/exercises/sessions/${sessionId}/exercises`);
+    return response.data.exercises;
   },
 };
 

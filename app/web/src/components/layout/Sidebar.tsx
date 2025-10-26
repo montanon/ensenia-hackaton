@@ -6,6 +6,7 @@ import type { SessionMode } from '../../types/session';
 import { Button } from '../ui/Button';
 import { cn } from '../../utils/helpers';
 import { NewSessionDialog } from '../session/NewSessionDialog';
+import { ConfigurationDialog } from '../settings/ConfigurationDialog';
 import { sessionApi } from '../../services/api';
 
 export const Sidebar: React.FC = () => {
@@ -23,6 +24,7 @@ export const Sidebar: React.FC = () => {
   const { clearMessages } = useChatStore();
 
   const [showNewSession, setShowNewSession] = useState(false);
+  const [showConfiguration, setShowConfiguration] = useState(false);
   const [isSwitchingMode, setIsSwitchingMode] = useState(false);
   const [modeError, setModeError] = useState<string | null>(null);
 
@@ -82,7 +84,7 @@ export const Sidebar: React.FC = () => {
     <div className="w-64 bg-white border-r border-gray-200 flex flex-col">
       {/* Header */}
       <div className="p-4 border-b border-gray-200">
-        <h1 className="text-xl font-bold text-gray-900">Ensenia</h1>
+        <h1 className="text-xl font-bold text-gray-900">Ense<span className="text-blue-600">ñ</span>IA</h1>
         <p className="text-sm text-gray-500">Tu asistente educativo</p>
       </div>
 
@@ -200,10 +202,29 @@ export const Sidebar: React.FC = () => {
       {/* Settings */}
       <div className="p-4 border-t border-gray-200">
         <button
+          onClick={() => setShowConfiguration(true)}
           aria-label="Abrir configuración"
-          className="w-full text-left px-3 py-2 rounded-lg text-sm text-gray-700 hover:bg-gray-100 transition-colors flex items-center gap-2"
+          className="w-full text-left px-3 py-2.5 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-100 hover:text-gray-900 transition-all duration-200 flex items-center gap-3 group"
         >
-          <span>⚙️</span>
+          <svg
+            className="w-5 h-5 text-gray-500 group-hover:text-gray-700 group-hover:rotate-90 transition-all duration-300"
+            fill="none"
+            stroke="currentColor"
+            viewBox="0 0 24 24"
+          >
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth={2}
+              d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"
+            />
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth={2}
+              d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"
+            />
+          </svg>
           <span>Configuración</span>
         </button>
       </div>
@@ -212,6 +233,12 @@ export const Sidebar: React.FC = () => {
       <NewSessionDialog
         isOpen={showNewSession}
         onClose={() => setShowNewSession(false)}
+      />
+
+      {/* Configuration Dialog */}
+      <ConfigurationDialog
+        isOpen={showConfiguration}
+        onClose={() => setShowConfiguration(false)}
       />
     </div>
   );

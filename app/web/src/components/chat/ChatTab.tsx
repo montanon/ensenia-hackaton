@@ -73,10 +73,19 @@ export const ChatTab: React.FC = () => {
   useEffect(() => {
     if (!currentSession) return;
 
+    console.log('[ChatTab] Connecting to WebSocket for session:', currentSession.id);
+    console.log('[ChatTab] Initial outputMode:', outputMode);
+
     // Connect WebSocket
     websocketService.connect(currentSession.id, {
       onConnected: () => {
+        console.log('[ChatTab] WebSocket connected successfully');
         setIsConnected(true);
+
+        // Sync initial output mode with backend
+        const wsMode = outputMode === 'voice' ? 'audio' : 'text';
+        console.log('[ChatTab] Syncing initial mode to backend:', wsMode);
+        websocketService.setMode(wsMode);
       },
 
       onTextChunk: (msg) => {
@@ -88,11 +97,18 @@ export const ChatTab: React.FC = () => {
       },
 
       onAudioReady: (msg) => {
+        console.log('[ChatTab] Audio ready received:', msg);
+        console.log('[ChatTab] Current outputMode:', outputMode);
+
         const audioUrl = `${API_URL}${msg.url}`;
+        console.log('[ChatTab] Constructed audio URL:', audioUrl);
+
         setCurrentAudio(audioUrl);
 
         // Auto-play if output mode is voice
         if (outputMode === 'voice') {
+          console.log('[ChatTab] Auto-playing audio...');
+
           // Clean up previous audio if playing
           if (audioRef.current) {
             audioRef.current.pause();
@@ -104,24 +120,34 @@ export const ChatTab: React.FC = () => {
           setSpeaking(true);
           setPlaying(true);
 
-          audio.onplay = () => setSpeaking(true);
+          audio.onplay = () => {
+            console.log('[ChatTab] Audio playback started');
+            setSpeaking(true);
+          };
+
           audio.onended = () => {
+            console.log('[ChatTab] Audio playback ended');
             setSpeaking(false);
             setPlaying(false);
             audioRef.current = null;
           };
-          audio.onerror = () => {
+
+          audio.onerror = (e) => {
+            console.error('[ChatTab] Audio playback error:', e);
+            console.error('[ChatTab] Audio error details:', audio.error);
             setSpeaking(false);
             setPlaying(false);
             audioRef.current = null;
           };
 
           audio.play().catch(err => {
-            console.error('[Chat] Audio playback failed:', err);
+            console.error('[ChatTab] Audio playback failed:', err);
             setSpeaking(false);
             setPlaying(false);
             audioRef.current = null;
           });
+        } else {
+          console.log('[ChatTab] Output mode is text, not auto-playing audio');
         }
       },
 
@@ -155,6 +181,8 @@ export const ChatTab: React.FC = () => {
   useEffect(() => {
     if (isConnected && currentSession) {
       const wsMode = outputMode === 'voice' ? 'audio' : 'text';
+      console.log('[ChatTab] Output mode changed to:', outputMode);
+      console.log('[ChatTab] Sending mode change to backend:', wsMode);
       websocketService.setMode(wsMode);
     }
   }, [outputMode, isConnected, currentSession]);
