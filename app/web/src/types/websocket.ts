@@ -4,6 +4,8 @@ export type WSMessageType =
   | 'connected'
   | 'text_chunk'
   | 'audio_ready'
+  | 'stt_partial'
+  | 'stt_result'
   | 'mode_changed'
   | 'message_complete'
   | 'error'
@@ -30,6 +32,18 @@ export interface WSAudioReadyMessage {
   duration?: number;
 }
 
+export interface WSSTTPartialMessage {
+  type: 'stt_partial';
+  transcript: string;
+  confidence?: number;
+}
+
+export interface WSSTTResultMessage {
+  type: 'stt_result';
+  transcript: string;
+  confidence?: number;
+}
+
 export interface WSModeChangedMessage {
   type: 'mode_changed';
   mode: CurrentMode;
@@ -54,6 +68,8 @@ export type WSIncomingMessage =
   | WSConnectedMessage
   | WSTextChunkMessage
   | WSAudioReadyMessage
+  | WSSTTPartialMessage
+  | WSSTTResultMessage
   | WSModeChangedMessage
   | WSMessageCompleteMessage
   | WSErrorMessage
@@ -73,7 +89,18 @@ export interface WSPingPayload {
   type: 'ping';
 }
 
+export interface WSAudioChunkPayload {
+  type: 'audio_chunk';
+  data: string; // base64 encoded audio
+}
+
+export interface WSAudioEndPayload {
+  type: 'audio_end';
+}
+
 export type WSOutgoingMessage =
   | WSSendMessagePayload
   | WSSetModePayload
-  | WSPingPayload;
+  | WSPingPayload
+  | WSAudioChunkPayload
+  | WSAudioEndPayload;
