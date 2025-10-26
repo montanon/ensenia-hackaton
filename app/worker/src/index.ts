@@ -8,6 +8,7 @@ import { handleSearch } from './routes/search';
 import { handleFetch } from './routes/fetch';
 import { handleGenerate } from './routes/generate';
 import { handleValidate } from './routes/validate';
+import { handlePopulateVectorize } from './routes/admin';
 import { jsonResponse, errorResponse, corsPreflightResponse } from './utils/responses';
 
 /**
@@ -60,6 +61,12 @@ export default {
           }
           break;
 
+        case '/admin/populate-vectorize':
+          if (request.method === 'POST') {
+            return await handlePopulateVectorize(request, env);
+          }
+          break;
+
         default:
           return errorResponse(404, 'NOT_FOUND', `Endpoint ${path} not found`);
       }
@@ -97,6 +104,7 @@ function handleRoot(): Response {
       'POST /fetch': 'Fetch curriculum content by IDs',
       'POST /generate': 'Generate Chilean-context explanations',
       'POST /validate': 'Validate content against ministry standards',
+      'POST /admin/populate-vectorize': 'Populate Vectorize index (admin only)',
     },
     documentation: 'See README.md and API_REFERENCE.md',
     repository: 'https://github.com/ensenia/cloudflare-worker',

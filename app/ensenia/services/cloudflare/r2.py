@@ -20,7 +20,7 @@ class R2Service:
         self.secret_key = settings.cloudflare_r2_secret_key
         self.session = aioboto3.Session()
 
-    async def _get_client(self):
+    async def _get_client(self):  # noqa: ANN202
         """Get S3 client configured for R2."""
         return self.session.client(
             "s3",

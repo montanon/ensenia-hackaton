@@ -12,27 +12,75 @@ from app.ensenia.database.session import close_db, get_db, init_db
 
 @pytest.fixture
 def event_loop():
-    """Create event loop for async tests."""
+    """Create event loop for async tests.
+
+    Creates a new event loop for each test function to ensure isolation.
+    """
     policy = asyncio.get_event_loop_policy()
     loop = policy.new_event_loop()
+    asyncio.set_event_loop(loop)
     yield loop
-    loop.close()
+    # Close any pending tasks
+    try:
+        loop.run_until_complete(loop.shutdown_asyncgens())
+    finally:
+        loop.close()
 
 
-@pytest.fixture(autouse=True)
+@pytest.fixture
 async def setup_database():
-    """Initialize database before tests."""
+    """Initialize database before tests.
+
+    Note: API integration tests don't need this as the TestClient
+    handles lifespan events. Only use this for unit tests that need
+    direct database access without going through the API.
+    """
     await init_db()
     yield
     await close_db()
 
 
-@pytest.fixture
+@pytest.fixture(scope="function", autouse=True)
+async def reset_db_engine():
+    """Reset the database engine before and after each test.
+
+    This ensures the engine is not tied to a stale event loop.
+    """
+    # Dispose before test to ensure clean state
+    from app.ensenia.database.session import engine
+
+    await engine.dispose()
+
+    yield
+
+    # Dispose after test to clean up
+    await engine.dispose()
+
+
+@pytest.fixture(scope="function")
 async def db_session() -> AsyncGenerator[AsyncSession, None]:
-    """Provide a database session for tests."""
-    async for session in get_db():
-        yield session
-        break
+    """Provide a database session for tests.
+
+    This creates a new session for each test to avoid event loop conflicts.
+    """
+    # Import here to avoid circular dependency issues
+    # Ensure database is initialized
+    from app.ensenia.database.models import Base
+    from app.ensenia.database.session import AsyncSessionLocal, engine
+
+    async with engine.begin() as conn:
+        await conn.run_sync(Base.metadata.create_all)
+
+    # Create and yield session
+    async with AsyncSessionLocal() as session:
+        try:
+            yield session
+            await session.commit()
+        except Exception:
+            await session.rollback()
+            raise
+        finally:
+            await session.close()
 
 
 @pytest.fixture(autouse=True)
@@ -48,8 +96,34 @@ def mock_settings(monkeypatch):
     mock_settings_obj.cloudflare_d1_database_id = "test-db-id"
     mock_settings_obj.cloudflare_vectorize_index = "test-index"
     mock_settings_obj.cloudflare_kv_namespace_id = "test-kv-id"
+
+    # New Worker integration settings
+    mock_settings_obj.cloudflare_worker_url = "https://test-worker.workers.dev"
+    mock_settings_obj.cloudflare_request_timeout = 30
+    mock_settings_obj.cloudflare_max_retries = 3
+    mock_settings_obj.cloudflare_cache_ttl = 3600
+
+    # OpenAI settings
+    mock_settings_obj.openai_api_key = "test-openai-key"
+    mock_settings_obj.openai_model = "gpt-4-turbo-preview"
+    mock_settings_obj.openai_max_tokens = 2000
+    mock_settings_obj.openai_temperature = 0.4
+
+    # ElevenLabs settings
     mock_settings_obj.elevenlabs_api_key = "test-elevenlabs-key"
     mock_settings_obj.elevenlabs_voice_id = "test-voice-id"
+
+    # Database settings
+    mock_settings_obj.database_url = (
+        "postgresql+asyncpg://test:test@localhost:5433/test"
+    )
+    mock_settings_obj.database_pool_size = 5
+    mock_settings_obj.database_max_overflow = 10
+
+    # Chat settings
+    mock_settings_obj.chat_context_window = 10
+
+    # App settings
     mock_settings_obj.environment = "test"
     mock_settings_obj.debug = True
     mock_settings_obj.log_level = "INFO"
@@ -64,8 +138,82 @@ def mock_settings(monkeypatch):
     mock_settings_obj.rag_chunk_overlap = 128
     mock_settings_obj.workers_ai_embedding_model = "@cf/baai/bge-base-en-v1.5"
     mock_settings_obj.workers_ai_embedding_dimensions = 768
+    mock_settings_obj.openai_api_key = "test-openai-key"
+    mock_settings_obj.openai_model = "gpt-4-turbo-preview"
+    mock_settings_obj.generation_max_iterations = 3
+    mock_settings_obj.generation_quality_threshold = 8
+    mock_settings_obj.generation_model = "gpt-4-turbo-preview"
+    mock_settings_obj.database_url = (
+        "postgresql+asyncpg://test:test@localhost:5433/test"
+    )
+    mock_settings_obj.cloudflare_worker_url = "http://localhost:8787"
+    mock_settings_obj.cache_dir = "./test_cache"
 
-    # Patch the settings object
-    monkeypatch.setattr("app.ensenia.core.config.settings", mock_settings_obj)
+    # Patch the get_settings function to return our mock
+    monkeypatch.setattr("app.ensenia.config.get_settings", lambda: mock_settings_obj)
+    monkeypatch.setattr(
+        "app.ensenia.services.research_service.settings", mock_settings_obj
+    )
 
     return mock_settings_obj
+
+
+@pytest.fixture
+def sample_multiple_choice_exercise():
+    """Sample multiple choice exercise content."""
+    return {
+        "question": "¿Cuál es la capital de Chile?",
+        "learning_objective": "Identificar la capital de Chile según las Bases Curriculares",
+        "options": ["Santiago", "Valparaíso", "Concepción", "Antofagasta"],
+        "correct_answer": 0,
+        "explanation": "Santiago es la capital de Chile desde 1818",
+    }
+
+
+@pytest.fixture
+def sample_true_false_exercise():
+    """Sample true/false exercise content."""
+    return {
+        "question": "Chile es un país ubicado en América del Sur",
+        "learning_objective": "Reconocer la ubicación geográfica de Chile",
+        "correct_answer": True,
+        "explanation": "Chile está ubicado en el extremo sudoeste de América del Sur",
+    }
+
+
+@pytest.fixture
+def sample_short_answer_exercise():
+    """Sample short answer exercise content."""
+    return {
+        "question": "Explica brevemente qué es la fotosíntesis",
+        "learning_objective": "Comprender el proceso de fotosíntesis en las plantas",
+        "rubric": [
+            "Menciona que es un proceso de las plantas",
+            "Explica que convierte luz solar en energía",
+            "Menciona el rol del CO2 y agua",
+        ],
+        "example_answer": "La fotosíntesis es el proceso por el cual las plantas convierten la luz solar, agua y CO2 en glucosa y oxígeno.",
+        "max_words": 100,
+    }
+
+
+@pytest.fixture
+def sample_essay_exercise():
+    """Sample essay exercise content."""
+    return {
+        "question": "Analiza las causas y consecuencias de la Independencia de Chile",
+        "learning_objective": "Analizar el proceso de independencia según Bases Curriculares",
+        "rubric": [
+            "Identifica causas internas y externas",
+            "Menciona personajes clave",
+            "Describe consecuencias políticas",
+            "Describe consecuencias sociales",
+        ],
+        "key_points": [
+            "Influencia de la Ilustración",
+            "Rol de líderes como O'Higgins y San Martín",
+            "Formación de la república",
+        ],
+        "min_words": 150,
+        "max_words": 500,
+    }

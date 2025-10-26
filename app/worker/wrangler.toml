@@ -4,7 +4,7 @@ compatibility_date = "2024-01-15"
 compatibility_flags = ["nodejs_compat"]
 
 # Account ID - replace with your actual account ID when deploying
-# account_id = "" # TODO: Add your Cloudflare account ID
+account_id = "88a509aab23f4ae093a86539d7d228bb"
 
 # Workers AI Binding
 [ai]
@@ -13,26 +13,26 @@ binding = "AI"
 # D1 Database Binding
 [[d1_databases]]
 binding = "DB"
-database_name = "ensenia-curriculum"
-database_id = "local-dev-db" # TODO: Replace with actual DB ID for production
+database_name = "ensenia-hackaton-d1"
+database_id = "f9ed2222-8b21-4950-8c35-cb92677c7d23"
 
-# Vectorize Binding
+# Vectorize Binding - Using existing index
 [[vectorize]]
 binding = "VECTOR_INDEX"
-index_name = "curriculum-embeddings"
+index_name = "ai-search-basic-rag"
 
 # KV Namespace for Caching
 [[kv_namespaces]]
 binding = "SEARCH_CACHE"
-id = "local-dev-kv" # TODO: Replace with actual KV namespace ID for production
-preview_id = "local-dev-kv"
+id = "da0ef0a0bd7943818fd185272bc5ff3d"
+preview_id = "da0ef0a0bd7943818fd185272bc5ff3d"
 
 # Environment Variables
 [vars]
 ENVIRONMENT = "development"
-EMBEDDING_MODEL = "@cf/baai/bge-base-en-v1.5"
+EMBEDDING_MODEL = "@cf/baai/bge-large-en-v1.5"  # Changed to large (1024 dims) to match your Vectorize
 GENERATION_MODEL = "@cf/meta/llama-3.1-8b-instruct"
-VECTOR_DIMENSION = "768"
+VECTOR_DIMENSION = "1024"  # Updated to match your Vectorize index
 CACHE_TTL_HOT = "3600"      # 1 hour for frequent queries
 CACHE_TTL_WARM = "86400"    # 24 hours for regular content
 CACHE_TTL_COLD = "604800"   # 7 days for static data

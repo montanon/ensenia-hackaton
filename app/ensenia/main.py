@@ -17,7 +17,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 
-from app.ensenia.api.routes import chat, tts, websocket
+from app.ensenia.api.routes import chat, exercises, tts, websocket
 from app.ensenia.config import get_settings
 from app.ensenia.database.session import close_db, init_db
 from app.ensenia.services.research_service import cleanup_research_service
@@ -104,6 +104,14 @@ def root() -> dict[str, Any]:
             },
             "websocket": {
                 "chat": "WS /ws/chat/{session_id}",
+            },
+            "exercises": {
+                "generate": "POST /exercises/generate",
+                "search": "POST /exercises/search",
+                "get": "GET /exercises/{id}",
+                "link_to_session": "POST /exercises/{id}/sessions/{session_id}",
+                "submit_answer": "POST /exercises/sessions/{exercise_session_id}/submit",
+                "get_session_exercises": "GET /exercises/sessions/{session_id}/exercises",
             },
             "docs": "GET /docs",
         },

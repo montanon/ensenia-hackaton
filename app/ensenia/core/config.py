@@ -15,13 +15,13 @@ class Settings(BaseSettings):
     )
 
     # Cloudflare API
-    cloudflare_api_token: str = "test-token"
+    cloudflare_api_token: str = "test-token"  # noqa: S105
     cloudflare_account_id: str = "test-account"
 
     # Cloudflare R2 (Object Storage)
     cloudflare_r2_bucket: str = "test-bucket"
     cloudflare_r2_access_key: str = "test-key"
-    cloudflare_r2_secret_key: str = "test-secret"
+    cloudflare_r2_secret_key: str = "test-secret"  # noqa: S105
     cloudflare_r2_endpoint: str = "https://test.r2.cloudflarestorage.com"
 
     # Cloudflare D1 (SQL Database)
@@ -33,9 +33,27 @@ class Settings(BaseSettings):
     # Cloudflare KV (Key-Value Cache)
     cloudflare_kv_namespace_id: str = "test-kv-id"
 
+    # Cloudflare Worker URL
+    cloudflare_worker_url: str = "http://localhost:8787"
+
+    # Database
+    database_url: str = "postgresql+asyncpg://ensenia:hackathon@localhost:5433/ensenia"
+
     # ElevenLabs Text-to-Speech
     elevenlabs_api_key: str = ""
     elevenlabs_voice_id: str = ""
+
+    # OpenAI
+    openai_api_key: str = ""
+    openai_model: str = "gpt-4-turbo-preview"
+
+    # Exercise Generation Settings
+    generation_max_iterations: int = 3
+    generation_quality_threshold: int = 8
+    generation_model: str = "gpt-4-turbo-preview"
+
+    # Cache Directory
+    cache_dir: str = "./cache"
 
     # Application Settings
     environment: str = "development"
@@ -43,7 +61,7 @@ class Settings(BaseSettings):
     log_level: str = "INFO"
 
     # API Settings
-    api_host: str = "0.0.0.0"
+    api_host: str = "0.0.0.0"  # noqa: S104
     api_port: int = 8000
     api_cors_origins: str = "http://localhost:3000,http://localhost:5173"
 
@@ -60,6 +78,9 @@ class Settings(BaseSettings):
     # Workers AI
     workers_ai_embedding_model: str = "@cf/baai/bge-base-en-v1.5"
     workers_ai_embedding_dimensions: int = 768
+
+    # Cloudflare Worker URL
+    cloudflare_worker_url: str = "http://localhost:8787"
 
     @field_validator("api_cors_origins", mode="after")
     @classmethod
