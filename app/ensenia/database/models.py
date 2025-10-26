@@ -5,6 +5,8 @@ Models:
 - Message: Individual messages in conversations
 - Exercise: Generated exercises for student practice
 - ExerciseSession: Junction table linking exercises to sessions
+- MinistryStandard: Chilean Ministry of Education learning objectives
+- CurriculumContent: Educational content aligned with ministry standards
 """
 
 from datetime import UTC, datetime
@@ -241,4 +243,90 @@ class ExerciseSession(Base):
         return (
             f"<ExerciseSession(id={self.id}, exercise_id={self.exercise_id}, "
             f"session_id={self.session_id}, completed={self.is_completed})>"
+        )
+
+
+class MinistryStandard(Base):
+    """Ministry Standard model.
+
+    Represents Chilean Ministry of Education learning objectives (OAs).
+    Used for curriculum alignment and validation.
+    """
+
+    __tablename__ = "ministry_standards"
+
+    oa_id: Mapped[str] = mapped_column(String(50), primary_key=True)
+    grade: Mapped[int] = mapped_column(nullable=False, index=True)
+    subject: Mapped[str] = mapped_column(nullable=False, index=True)
+    oa_code: Mapped[str] = mapped_column(String(20), nullable=False)
+    description: Mapped[str] = mapped_column(Text, nullable=False)
+    skills: Mapped[list] = mapped_column(JSONB, nullable=False)
+    keywords: Mapped[str] = mapped_column(Text, nullable=False)
+    official_document_ref: Mapped[str] = mapped_column(String(255), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        server_default=func.now(), nullable=False
+    )
+
+    __table_args__ = (
+        Index("idx_ministry_grade_subject", "grade", "subject"),
+        Index("idx_ministry_oa_code", "oa_code"),
+    )
+
+    def __repr__(self) -> str:
+        """Return string representation of MinistryStandard."""
+        return (
+            f"<MinistryStandard(oa_id={self.oa_id}, grade={self.grade}, "
+            f"subject={self.subject}, oa_code={self.oa_code})>"
+        )
+
+
+class CurriculumContent(Base):
+    """Curriculum Content model.
+
+    Represents educational content chunks aligned with ministry standards.
+    Used for RAG retrieval and content generation.
+    """
+
+    __tablename__ = "curriculum_content"
+
+    id: Mapped[str] = mapped_column(String(50), primary_key=True)
+    title: Mapped[str] = mapped_column(String(255), nullable=False)
+    grade: Mapped[int] = mapped_column(nullable=False, index=True)
+    subject: Mapped[str] = mapped_column(nullable=False, index=True)
+    content_text: Mapped[str] = mapped_column(Text, nullable=False)
+    learning_objectives: Mapped[list] = mapped_column(
+        JSONB, nullable=False
+    )  # Array of OA IDs
+    ministry_standard_ref: Mapped[str] = mapped_column(String(255), nullable=False)
+    ministry_approved: Mapped[int] = mapped_column(
+        Integer, nullable=False, default=0, server_default="0"
+    )  # 0=pending, 1=approved
+    keywords: Mapped[str] = mapped_column(Text, nullable=False, index=True)
+    difficulty_level: Mapped[str] = mapped_column(
+        String(20), nullable=False, index=True
+    )  # easy, medium, hard
+    created_at: Mapped[datetime] = mapped_column(
+        server_default=func.now(), nullable=False
+    )
+
+    # Additional metadata for RAG
+    chunk_index: Mapped[int | None] = mapped_column(
+        Integer, nullable=True, default=0, server_default="0"
+    )
+    source_file: Mapped[str | None] = mapped_column(String(500), nullable=True)
+    embedding_generated: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, default=False, server_default="false"
+    )
+
+    __table_args__ = (
+        Index("idx_curriculum_grade_subject", "grade", "subject"),
+        Index("idx_curriculum_difficulty", "difficulty_level"),
+        Index("idx_curriculum_embedding", "embedding_generated"),
+    )
+
+    def __repr__(self) -> str:
+        """Return string representation of CurriculumContent."""
+        return (
+            f"<CurriculumContent(id={self.id}, title={self.title}, "
+            f"grade={self.grade}, subject={self.subject})>"
         )
