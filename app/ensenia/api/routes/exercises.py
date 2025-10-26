@@ -8,6 +8,7 @@ Endpoints:
 - POST /exercise-sessions/{id}/submit: Submit answer for an exercise
 """
 
+import asyncio
 import logging
 from typing import Annotated
 
@@ -15,7 +16,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.ensenia.database.models import Exercise as DBExercise
-from app.ensenia.database.session import get_db
+from app.ensenia.database.session import AsyncSessionLocal, get_db
 from app.ensenia.schemas.exercises import (
     DifficultyLevel,
     EssayContent,
@@ -26,11 +27,13 @@ from app.ensenia.schemas.exercises import (
     GenerateExerciseResponse,
     LinkExerciseResponse,
     MultipleChoiceContent,
-    SearchExercisesRequest,
     ShortAnswerContent,
     SubmitAnswerRequest,
     SubmitAnswerResponse,
     TrueFalseContent,
+)
+from app.ensenia.services.exercise_pool_service import (
+    get_exercise_pool_service,
 )
 from app.ensenia.services.exercise_repository import (
     ExerciseRepository,
@@ -44,6 +47,8 @@ from app.ensenia.services.generation_service import (
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/exercises", tags=["exercises"])
+
+background_tasks: set[asyncio.Task] = set()
 
 
 # ============================================================================
@@ -195,14 +200,24 @@ async def generate_exercise(
 async def search_exercises(
     db: Annotated[AsyncSession, Depends(get_db)],
     repository: Annotated[ExerciseRepository, Depends(get_exercise_repository)],
-    grade: int | None = Query(None, ge=1, le=12, description="Grade level filter"),
-    subject: str | None = Query(None, max_length=100, description="Subject filter"),
-    topic: str | None = Query(None, max_length=200, description="Topic filter"),
-    exercise_type: ExerciseType | None = Query(None, description="Exercise type filter"),
-    difficulty_level: DifficultyLevel | None = Query(
-        None, description="Difficulty level filter"
-    ),
-    limit: int = Query(10, ge=1, le=100, description="Maximum number of results"),
+    grade: Annotated[
+        int | None, Query(None, ge=1, le=12, description="Grade level filter")
+    ] = None,
+    subject: Annotated[
+        str | None, Query(None, max_length=100, description="Subject filter")
+    ] = None,
+    topic: Annotated[
+        str | None, Query(None, max_length=200, description="Topic filter")
+    ] = None,
+    exercise_type: Annotated[
+        ExerciseType | None, Query(None, description="Exercise type filter")
+    ] = None,
+    difficulty_level: Annotated[
+        DifficultyLevel | None, Query(None, description="Difficulty level filter")
+    ] = None,
+    limit: Annotated[
+        int, Query(10, ge=1, le=100, description="Maximum number of results")
+    ] = 10,
 ) -> ExerciseListResponse:
     """Search for existing reusable exercises.
 
@@ -353,16 +368,19 @@ async def submit_answer(
     request: SubmitAnswerRequest,
     db: Annotated[AsyncSession, Depends(get_db)],
     repository: Annotated[ExerciseRepository, Depends(get_exercise_repository)],
+    generation_service: Annotated[GenerationService, Depends(get_generation_service)],
 ) -> SubmitAnswerResponse:
     """Submit a student's answer for an exercise.
 
     This records the student's answer and marks the exercise as completed.
+    Also triggers pool maintenance to ensure exercise pool stays healthy.
 
     Args:
         exercise_session_id: ExerciseSession ID
         request: Answer submission
         db: Database session
         repository: Exercise repository
+        generation_service: Exercise generation service
 
     Returns:
         Submission confirmation
@@ -377,6 +395,32 @@ async def submit_answer(
             exercise_session_id=exercise_session_id,
             answer=request.answer,
         )
+
+        # Get session_id before triggering background task
+        session_id = exercise_session.session_id
+
+        # Trigger pool maintenance in background (non-blocking)
+        # Create background task with its own database session
+        async def maintain_pool_background() -> None:
+            """Background task to maintain exercise pool with separate DB session."""
+            async with AsyncSessionLocal() as bg_db:
+                try:
+                    pool_service = get_exercise_pool_service(
+                        generation_service, repository
+                    )
+                    await pool_service.maintain_pool(
+                        session_id=session_id, db=bg_db, min_pool_size=3
+                    )
+                except Exception:
+                    msg = f"Background pool maintenance failed for session {session_id}"
+                    logger.exception(msg)
+
+        task = asyncio.create_task(maintain_pool_background())
+        background_tasks.add(task)
+        task.add_done_callback(background_tasks.discard)
+
+        msg = f"Answer submitted for exercise_session {exercise_session_id}, "
+        logger.info(msg)
 
         return SubmitAnswerResponse(
             is_completed=exercise_session.is_completed,
