@@ -5,6 +5,10 @@ interface InitStatus {
   research_loaded: boolean;
   initial_exercises_ready: boolean;
   exercise_count: number;
+  learning_content_ready?: boolean;
+  study_guide_ready?: boolean;
+  pending_exercises?: number;
+  pool_health?: string;
 }
 
 interface SessionStore {
@@ -77,6 +81,9 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
       research_loaded: false,
       initial_exercises_ready: false,
       exercise_count: 0,
+      learning_content_ready: false,
+      study_guide_ready: false,
+      pending_exercises: 0,
     },
     initError: null,
   }),
