@@ -172,6 +172,23 @@ def mock_settings(monkeypatch):
 
 
 @pytest.fixture
+def sample_text():
+    """Sample Spanish curriculum text for testing chunking."""
+    return """
+    La fotosíntesis es un proceso fundamental realizado por las plantas y algunos organismos
+    para convertir la energía lumínica en energía química. Este proceso ocurre principalmente
+    en los cloroplastos de las células vegetales.
+
+    Durante la fotosíntesis, las plantas absorben dióxido de carbono del aire y agua del suelo.
+    Con la ayuda de la luz solar, estos elementos se transforman en glucosa (azúcar) y oxígeno.
+    La glucosa sirve como alimento para la planta, mientras que el oxígeno se libera a la atmósfera.
+
+    Este proceso es esencial para la vida en la Tierra, ya que proporciona el oxígeno que respiramos
+    y es la base de la mayoría de las cadenas alimentarias.
+    """
+
+
+@pytest.fixture
 def sample_multiple_choice_exercise():
     """Sample multiple choice exercise content."""
     return {

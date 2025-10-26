@@ -105,6 +105,10 @@ class Settings(BaseSettings):
     # Workers AI
     workers_ai_embedding_model: str = "@cf/baai/bge-base-en-v1.5"
     workers_ai_embedding_dimensions: int = 768
+    workers_ai_timeout_connect: int = 10  # seconds to establish connection
+    workers_ai_timeout_read: int = 60  # seconds to read response
+    workers_ai_timeout_write: int = 120  # seconds to send request (large text chunks)
+    workers_ai_timeout_pool: int = 10  # seconds to acquire connection from pool
 
     @field_validator("api_cors_origins", mode="after")
     @classmethod

@@ -367,6 +367,13 @@ class RAGDatabasePopulator:
 
 async def main() -> None:
     """Entry point."""
+    # Configure logging
+    logging.basicConfig(
+        level=logging.INFO,
+        format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+        handlers=[logging.StreamHandler()],
+    )
+
     parser = argparse.ArgumentParser(
         description="Populate RAG database from grade folder structure",
         formatter_class=argparse.RawDescriptionHelpFormatter,
