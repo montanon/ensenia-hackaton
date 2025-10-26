@@ -33,9 +33,27 @@ class Settings(BaseSettings):
     # Cloudflare KV (Key-Value Cache)
     cloudflare_kv_namespace_id: str = "test-kv-id"
 
+    # Cloudflare Worker URL
+    cloudflare_worker_url: str = "http://localhost:8787"
+
+    # Database
+    database_url: str = "postgresql+asyncpg://ensenia:hackathon@localhost:5433/ensenia"
+
     # ElevenLabs Text-to-Speech
     elevenlabs_api_key: str = ""
     elevenlabs_voice_id: str = ""
+
+    # OpenAI
+    openai_api_key: str = ""
+    openai_model: str = "gpt-4-turbo-preview"
+
+    # Exercise Generation Settings
+    generation_max_iterations: int = 3
+    generation_quality_threshold: int = 8
+    generation_model: str = "gpt-4-turbo-preview"
+
+    # Cache Directory
+    cache_dir: str = "./cache"
 
     # Application Settings
     environment: str = "development"
