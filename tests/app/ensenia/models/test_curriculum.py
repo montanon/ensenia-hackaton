@@ -188,14 +188,14 @@ class TestValidateModels:
     def test_validation_details_valid(self):
         """Test ValidationDetails with valid data."""
         details = ValidationDetails(
-            oa_alignment_score=0.9,
-            grade_appropriate_score=0.85,
-            chilean_terminology_score=0.9,
-            learning_coverage_score=0.83,
+            oa_alignment_score=90,
+            grade_appropriate_score=85,
+            chilean_terminology_score=92,
+            learning_coverage_score=88,
             issues=["Issue 1"],
             recommendations=["Recommendation 1"],
         )
-        assert details.oa_alignment_score == 0.9
+        assert details.oa_alignment_score == 90
         assert len(details.issues) == 1
 
     def test_validate_request_valid(self):
@@ -213,20 +213,20 @@ class TestValidateModels:
         """Test ValidateResponse with valid data."""
         response = ValidateResponse(
             is_valid=True,
-            score=0.87,
+            score=87,
             validation_details=ValidationDetails(
-                oa_alignment_score=0.9,
-                grade_appropriate_score=0.85,
-                chilean_terminology_score=0.9,
-                learning_coverage_score=0.83,
+                oa_alignment_score=92,
+                grade_appropriate_score=85,
+                chilean_terminology_score=90,
+                learning_coverage_score=83,
                 issues=[],
                 recommendations=["Add examples"],
             ),
             validation_time_ms=156.3,
         )
         assert response.is_valid is True
-        assert response.score == 0.87
-        assert 0.0 <= response.score <= 1.0
+        assert response.score == 87
+        assert 0.0 <= response.score <= 100.0
 
     def test_validate_response_score_bounds(self):
         """Test ValidateResponse enforces score bounds."""
@@ -234,12 +234,12 @@ class TestValidateModels:
         with pytest.raises(ValidationError):
             ValidateResponse(
                 is_valid=True,
-                score=1.5,  # Must be 0.0-1.0
+                score=150,  # Must be 0-100
                 validation_details=ValidationDetails(
-                    oa_alignment_score=0.9,
-                    grade_appropriate_score=0.85,
-                    chilean_terminology_score=0.9,
-                    learning_coverage_score=0.83,
+                    oa_alignment_score=92,
+                    grade_appropriate_score=85,
+                    chilean_terminology_score=90,
+                    learning_coverage_score=83,
                     issues=[],
                     recommendations=[],
                 ),

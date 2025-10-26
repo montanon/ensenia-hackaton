@@ -109,15 +109,17 @@ class GenerateResponse(BaseModel):
 class ValidationDetails(BaseModel):
     """Detailed validation metrics."""
 
-    oa_alignment_score: float = Field(..., description="OA alignment score (0.0-1.0)")
+    oa_alignment_score: float = Field(
+        ..., ge=0.0, le=100.0, description="OA alignment score (0-100)"
+    )
     grade_appropriate_score: float = Field(
-        ..., description="Grade appropriateness score (0.0-1.0)"
+        ..., ge=0.0, le=100.0, description="Grade appropriateness score (0-100)"
     )
     chilean_terminology_score: float = Field(
-        ..., description="Chilean terminology score (0.0-1.0)"
+        ..., ge=0.0, le=100.0, description="Chilean terminology score (0-100)"
     )
     learning_coverage_score: float = Field(
-        ..., description="Learning coverage score (0.0-1.0)"
+        ..., ge=0.0, le=100.0, description="Learning coverage score (0-100)"
     )
     issues: list[str] = Field(..., description="Identified issues")
     recommendations: list[str] = Field(..., description="Improvement recommendations")
@@ -136,7 +138,7 @@ class ValidateResponse(BaseModel):
     """Response model for content validation."""
 
     is_valid: bool = Field(..., description="Overall validation result")
-    score: float = Field(..., ge=0.0, le=1.0, description="Overall validation score")
+    score: float = Field(..., ge=0.0, le=100.0, description="Overall validation score")
     validation_details: ValidationDetails = Field(..., description="Detailed metrics")
     validation_time_ms: float = Field(
         ..., description="Validation time in milliseconds"
