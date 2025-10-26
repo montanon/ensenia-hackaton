@@ -18,14 +18,14 @@ export interface TrueFalseContent {
 export interface ShortAnswerContent {
   question: string;
   learning_objective: string;
-  rubric: string;
+  rubric: string[];
   example_answer: string;
 }
 
 export interface EssayContent {
   question: string;
   learning_objective: string;
-  rubric: string;
+  rubric: string[];
   key_points: string[];
   min_words: number;
   max_words: number;
@@ -68,11 +68,26 @@ export interface SubmitAnswerRequest {
 export interface ValidationResult {
   score: number;
   feedback: string;
-  issues: string[];
+  is_approved: boolean;
+  iteration: number;
 }
 
 export interface GenerateExerciseResponse {
   exercise: Exercise;
   validation_history: ValidationResult[];
   iterations_used: number;
+}
+
+export interface LinkExerciseResponse {
+  exercise_session_id: number;
+  exercise_id: number;
+  session_id: number;
+  assigned_at: string;
+}
+
+export interface SubmitAnswerResponse {
+  is_completed: boolean;
+  completed_at: string | null;
+  feedback: string | null;
+  is_correct?: boolean;
 }

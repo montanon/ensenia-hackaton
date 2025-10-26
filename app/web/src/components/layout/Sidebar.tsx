@@ -1,9 +1,12 @@
 import React, { useState } from 'react';
 import { useSessionStore } from '../../stores/sessionStore';
+import { useChatStore } from '../../stores/chatStore';
 import { SESSION_MODES } from '../../utils/constants';
+import type { SessionMode } from '../../types/session';
 import { Button } from '../ui/Button';
 import { cn } from '../../utils/helpers';
 import { NewSessionDialog } from '../session/NewSessionDialog';
+import { sessionApi } from '../../services/api';
 
 export const Sidebar: React.FC = () => {
   const {
@@ -14,9 +17,66 @@ export const Sidebar: React.FC = () => {
     setMode,
     toggleInputMode,
     toggleOutputMode,
+    setCurrentSession,
+    addToHistory,
   } = useSessionStore();
+  const { clearMessages } = useChatStore();
 
   const [showNewSession, setShowNewSession] = useState(false);
+  const [isSwitchingMode, setIsSwitchingMode] = useState(false);
+  const [modeError, setModeError] = useState<string | null>(null);
+
+  const handleModeSelect = async (nextMode: SessionMode) => {
+    setMode(nextMode);
+
+    if (!currentSession) {
+      return;
+    }
+
+    if (currentSession.mode === nextMode) {
+      return;
+    }
+
+    const confirmed = window.confirm(
+      'Cambiar el modo reiniciará la sesión actual. ¿Deseas continuar?'
+    );
+
+    if (!confirmed) {
+      setMode(currentSession.mode as SessionMode);
+      return;
+    }
+
+    setIsSwitchingMode(true);
+    setModeError(null);
+
+    try {
+      const response = await sessionApi.create({
+        grade: currentSession.grade,
+        subject: currentSession.subject,
+        mode: nextMode,
+      });
+
+      const newSession = {
+        id: response.session_id,
+        grade: response.grade,
+        subject: response.subject,
+        mode: response.mode,
+        created_at: response.created_at,
+        current_mode: 'text' as const,
+        research_context: currentSession.research_context,
+      };
+
+      setCurrentSession(newSession);
+      addToHistory(newSession);
+      clearMessages();
+    } catch (error) {
+      console.error('[Sidebar] Failed to switch learning mode:', error);
+      setModeError('No se pudo cambiar el modo. Intenta nuevamente.');
+      setMode(currentSession.mode as SessionMode);
+    } finally {
+      setIsSwitchingMode(false);
+    }
+  };
 
   return (
     <div className="w-64 bg-white border-r border-gray-200 flex flex-col">
@@ -61,13 +121,14 @@ export const Sidebar: React.FC = () => {
             {SESSION_MODES.map((sessionMode) => (
               <button
                 key={sessionMode.value}
-                onClick={() => setMode(sessionMode.value as any)}
+                onClick={() => handleModeSelect(sessionMode.value as SessionMode)}
                 className={cn(
                   'w-full text-left px-3 py-2 rounded-lg text-sm transition-colors',
                   mode === sessionMode.value
                     ? 'bg-blue-100 text-blue-900 font-medium'
                     : 'text-gray-700 hover:bg-gray-100'
                 )}
+                disabled={isSwitchingMode}
               >
                 <div className="flex items-center gap-2">
                   <span>{sessionMode.icon}</span>
@@ -79,6 +140,9 @@ export const Sidebar: React.FC = () => {
               </button>
             ))}
           </div>
+          {modeError && (
+            <p className="mt-2 text-xs text-red-600">{modeError}</p>
+          )}
         </div>
       )}
 
@@ -93,6 +157,7 @@ export const Sidebar: React.FC = () => {
             <div className="flex gap-2">
               <button
                 onClick={() => toggleInputMode()}
+                aria-label={`Cambiar entrada a ${inputMode === 'text' ? 'voz' : 'texto'}`}
                 className={cn(
                   'flex-1 px-3 py-2 rounded-lg text-sm font-medium transition-colors',
                   inputMode === 'text'
@@ -111,6 +176,7 @@ export const Sidebar: React.FC = () => {
             <div className="flex gap-2">
               <button
                 onClick={() => toggleOutputMode()}
+                aria-label={`Cambiar salida a ${outputMode === 'voice' ? 'texto' : 'audio'}`}
                 className={cn(
                   'flex-1 px-3 py-2 rounded-lg text-sm font-medium transition-colors',
                   outputMode === 'voice'
@@ -133,7 +199,10 @@ export const Sidebar: React.FC = () => {
 
       {/* Settings */}
       <div className="p-4 border-t border-gray-200">
-        <button className="w-full text-left px-3 py-2 rounded-lg text-sm text-gray-700 hover:bg-gray-100 transition-colors flex items-center gap-2">
+        <button
+          aria-label="Abrir configuración"
+          className="w-full text-left px-3 py-2 rounded-lg text-sm text-gray-700 hover:bg-gray-100 transition-colors flex items-center gap-2"
+        >
           <span>⚙️</span>
           <span>Configuración</span>
         </button>

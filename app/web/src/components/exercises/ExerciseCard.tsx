@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import type { Exercise } from '../../types/exercise';
+import type { Exercise, MultipleChoiceContent, TrueFalseContent, ShortAnswerContent, SubmitAnswerResponse } from '../../types/exercise';
 import { MultipleChoice } from './MultipleChoice';
 import { TrueFalse } from './TrueFalse';
 import { ShortAnswer } from './ShortAnswer';
@@ -7,7 +7,7 @@ import { ExerciseResults } from './ExerciseResults';
 
 interface ExerciseCardProps {
   exercise: Exercise;
-  onSubmit: (answer: string) => Promise<any>;
+  onSubmit: (answer: string) => Promise<SubmitAnswerResponse>;
 }
 
 export const ExerciseCard: React.FC<ExerciseCardProps> = ({
@@ -15,16 +15,18 @@ export const ExerciseCard: React.FC<ExerciseCardProps> = ({
   onSubmit,
 }) => {
   const [submitting, setSubmitting] = useState(false);
-  const [result, setResult] = useState<any>(null);
+  const [result, setResult] = useState<SubmitAnswerResponse | null>(null);
+  const [error, setError] = useState<string | null>(null);
 
   const handleSubmit = async (answer: string) => {
     setSubmitting(true);
+    setError(null);
     try {
       const response = await onSubmit(answer);
       setResult(response);
     } catch (error) {
       console.error('[Exercise] Submission failed:', error);
-      alert('Error al enviar respuesta');
+      setError('Error al enviar respuesta. Por favor intenta nuevamente.');
     } finally {
       setSubmitting(false);
     }
@@ -35,7 +37,7 @@ export const ExerciseCard: React.FC<ExerciseCardProps> = ({
       case 'multiple_choice':
         return (
           <MultipleChoice
-            content={exercise.content as any}
+            content={exercise.content as MultipleChoiceContent}
             onSubmit={handleSubmit}
             disabled={submitting || !!result}
           />
@@ -43,7 +45,7 @@ export const ExerciseCard: React.FC<ExerciseCardProps> = ({
       case 'true_false':
         return (
           <TrueFalse
-            content={exercise.content as any}
+            content={exercise.content as TrueFalseContent}
             onSubmit={handleSubmit}
             disabled={submitting || !!result}
           />
@@ -51,7 +53,7 @@ export const ExerciseCard: React.FC<ExerciseCardProps> = ({
       case 'short_answer':
         return (
           <ShortAnswer
-            content={exercise.content as any}
+            content={exercise.content as ShortAnswerContent}
             onSubmit={handleSubmit}
             disabled={submitting || !!result}
           />
@@ -87,12 +89,28 @@ export const ExerciseCard: React.FC<ExerciseCardProps> = ({
       {/* Exercise Content */}
       {renderExercise()}
 
+      {/* Error */}
+      {error && (
+        <div className="mt-4 p-3 bg-red-50 border border-red-200 rounded-lg flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <span className="text-red-600">⚠️</span>
+            <p className="text-sm text-red-800">{error}</p>
+          </div>
+          <button
+            onClick={() => setError(null)}
+            className="text-red-600 hover:text-red-800 text-sm font-medium"
+          >
+            Cerrar
+          </button>
+        </div>
+      )}
+
       {/* Results */}
       {result && (
         <div className="mt-4">
           <ExerciseResults
-            isCorrect={result.is_correct || false}
-            explanation={result.feedback || result.explanation || 'Respuesta recibida'}
+            isCorrect={result.is_correct ?? true}
+            explanation={result.feedback || 'Respuesta registrada exitosamente.'}
           />
         </div>
       )}

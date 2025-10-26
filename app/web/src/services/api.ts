@@ -10,6 +10,8 @@ import type {
   Exercise,
   SubmitAnswerRequest,
   GenerateExerciseResponse,
+  LinkExerciseResponse,
+  SubmitAnswerResponse,
 } from '../types/exercise';
 import type { SendMessageRequest, SendMessageResponse } from '../types/message';
 
@@ -58,12 +60,13 @@ export const exerciseApi = {
     return response.data;
   },
 
-  assignToSession: async (exerciseId: number, sessionId: number): Promise<void> => {
-    await api.post(`/exercises/${exerciseId}/sessions/${sessionId}`);
+  assignToSession: async (exerciseId: number, sessionId: number): Promise<LinkExerciseResponse> => {
+    const response = await api.post<LinkExerciseResponse>(`/exercises/${exerciseId}/sessions/${sessionId}`);
+    return response.data;
   },
 
-  submit: async (exerciseSessionId: number, data: SubmitAnswerRequest): Promise<any> => {
-    const response = await api.post(`/exercises/sessions/${exerciseSessionId}/submit`, data);
+  submit: async (exerciseSessionId: number, data: SubmitAnswerRequest): Promise<SubmitAnswerResponse> => {
+    const response = await api.post<SubmitAnswerResponse>(`/exercises/sessions/${exerciseSessionId}/submit`, data);
     return response.data;
   },
 };

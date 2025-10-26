@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import { useSessionStore } from '../../stores/sessionStore';
 import { useChatStore } from '../../stores/chatStore';
 import { useAudioStore } from '../../stores/audioStore';
@@ -28,6 +28,8 @@ export const ChatTab: React.FC = () => {
     setGenerating,
   } = useExerciseStore();
   const [isConnected, setIsConnected] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const audioRef = useRef<HTMLAudioElement | null>(null);
 
   const handleGenerateExercise = async () => {
     if (!currentSession) return;
@@ -42,22 +44,19 @@ export const ChatTab: React.FC = () => {
         difficulty_level: 3,
       });
 
-      // Extract exercise from wrapped response
       const exercise = response.exercise;
+      let assignedSessionId: number | undefined;
 
-      // Log validation info (optional)
-      console.log('[Exercise] Validated with score:', response.validation_history);
-      console.log('[Exercise] Iterations used:', response.iterations_used);
-
-      // Assign to session
       if (exercise.id && currentSession.id) {
-        await exerciseApi.assignToSession(exercise.id, currentSession.id);
+        const link = await exerciseApi.assignToSession(exercise.id, currentSession.id);
+        assignedSessionId = link.exercise_session_id;
       }
 
-      setCurrentExercise(exercise);
+      setCurrentExercise(exercise, assignedSessionId);
+      setError(null);
     } catch (error) {
       console.error('[Exercise] Generation failed:', error);
-      alert('Error al generar ejercicio');
+      setError('Error al generar ejercicio. Por favor intenta nuevamente.');
     } finally {
       setGenerating(false);
     }
@@ -65,15 +64,10 @@ export const ChatTab: React.FC = () => {
 
   const handleSubmitExercise = async (answer: string) => {
     if (!exerciseSessionId) {
-      // For MVP, just show mock feedback
-      return {
-        is_correct: Math.random() > 0.5,
-        feedback: 'Respuesta recibida. Funcionalidad de evaluación en desarrollo.',
-      };
+      throw new Error('El ejercicio aún no está vinculado a esta sesión.');
     }
 
-    const result = await exerciseApi.submit(exerciseSessionId, { answer });
-    return result;
+    return exerciseApi.submit(exerciseSessionId, { answer });
   };
 
   useEffect(() => {
@@ -81,8 +75,7 @@ export const ChatTab: React.FC = () => {
 
     // Connect WebSocket
     websocketService.connect(currentSession.id, {
-      onConnected: (msg) => {
-        console.log('[Chat] WebSocket connected:', msg);
+      onConnected: () => {
         setIsConnected(true);
       },
 
@@ -100,7 +93,14 @@ export const ChatTab: React.FC = () => {
 
         // Auto-play if output mode is voice
         if (outputMode === 'voice') {
+          // Clean up previous audio if playing
+          if (audioRef.current) {
+            audioRef.current.pause();
+            audioRef.current = null;
+          }
+
           const audio = new Audio(audioUrl);
+          audioRef.current = audio;
           setSpeaking(true);
           setPlaying(true);
 
@@ -108,31 +108,33 @@ export const ChatTab: React.FC = () => {
           audio.onended = () => {
             setSpeaking(false);
             setPlaying(false);
+            audioRef.current = null;
           };
           audio.onerror = () => {
             setSpeaking(false);
             setPlaying(false);
+            audioRef.current = null;
           };
 
           audio.play().catch(err => {
             console.error('[Chat] Audio playback failed:', err);
             setSpeaking(false);
             setPlaying(false);
+            audioRef.current = null;
           });
         }
       },
 
-      onModeChanged: (msg) => {
-        console.log('[Chat] Mode changed:', msg.mode);
+      onModeChanged: () => {
+        // Mode changed - could update UI if needed
       },
 
       onError: (msg) => {
         console.error('[Chat] WebSocket error:', msg.message);
-        alert(`Error: ${msg.message}`);
+        setError(`Error: ${msg.message}`);
       },
 
       onDisconnect: () => {
-        console.log('[Chat] WebSocket disconnected');
         setIsConnected(false);
       },
     });
@@ -140,8 +142,14 @@ export const ChatTab: React.FC = () => {
     return () => {
       websocketService.disconnect();
       setIsConnected(false);
+
+      // Clean up audio if playing
+      if (audioRef.current) {
+        audioRef.current.pause();
+        audioRef.current = null;
+      }
     };
-  }, [currentSession?.id]);
+  }, [currentSession, outputMode, appendStreamChunk, completeStream, setCurrentAudio, setSpeaking, setPlaying]);
 
   // Update WebSocket mode when output mode changes
   useEffect(() => {
@@ -215,6 +223,22 @@ export const ChatTab: React.FC = () => {
           </div>
         </div>
       </div>
+
+      {/* Error Banner */}
+      {error && (
+        <div className="px-6 py-3 bg-red-50 border-b border-red-200 flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <span className="text-red-600">⚠️</span>
+            <p className="text-sm text-red-800">{error}</p>
+          </div>
+          <button
+            onClick={() => setError(null)}
+            className="text-red-600 hover:text-red-800 text-sm font-medium"
+          >
+            Cerrar
+          </button>
+        </div>
+      )}
 
       {/* Generate Exercise Button (Practice Mode) */}
       {mode === 'practice' && !currentExercise && (

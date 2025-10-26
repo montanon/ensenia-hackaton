@@ -11,6 +11,11 @@ import type {
   WSErrorMessage,
 } from '../types/websocket';
 
+// WebSocket configuration constants
+const MAX_RECONNECT_ATTEMPTS = 5;
+const INITIAL_RECONNECT_DELAY_MS = 1000;
+const PING_INTERVAL_MS = 30000;
+
 type MessageHandler = {
   onConnected?: (msg: WSConnectedMessage) => void;
   onTextChunk?: (msg: WSTextChunkMessage) => void;
@@ -26,8 +31,8 @@ export class WebSocketService {
   private sessionId: number | null = null;
   private handlers: MessageHandler = {};
   private reconnectAttempts = 0;
-  private maxReconnectAttempts = 5;
-  private reconnectDelay = 1000;
+  private maxReconnectAttempts = MAX_RECONNECT_ATTEMPTS;
+  private reconnectDelay = INITIAL_RECONNECT_DELAY_MS;
   private pingInterval: number | null = null;
 
   connect(sessionId: number, handlers: MessageHandler): void {
@@ -38,7 +43,6 @@ export class WebSocketService {
     this.ws = new WebSocket(wsUrl);
 
     this.ws.onopen = () => {
-      console.log('[WS] Connected to session:', sessionId);
       this.reconnectAttempts = 0;
       this.startPing();
     };
@@ -57,7 +61,6 @@ export class WebSocketService {
     };
 
     this.ws.onclose = () => {
-      console.log('[WS] Disconnected');
       this.stopPing();
       this.handlers.onDisconnect?.();
       this.attemptReconnect();
@@ -111,7 +114,7 @@ export class WebSocketService {
   private startPing(): void {
     this.pingInterval = window.setInterval(() => {
       this.send({ type: 'ping' });
-    }, 30000); // Ping every 30 seconds
+    }, PING_INTERVAL_MS);
   }
 
   private stopPing(): void {
@@ -129,8 +132,6 @@ export class WebSocketService {
 
     this.reconnectAttempts++;
     const delay = this.reconnectDelay * Math.pow(2, this.reconnectAttempts - 1);
-
-    console.log(`[WS] Reconnecting in ${delay}ms (attempt ${this.reconnectAttempts})`);
 
     setTimeout(() => {
       if (this.sessionId) {
