@@ -113,7 +113,12 @@ async def websocket_chat_endpoint(  # noqa: C901, PLR0912, PLR0915
             elif message_type == "set_mode":
                 # Handle mode switching
                 new_mode = message_data.get("mode")
+                msg = f"[WebSocket] Mode change requested for session {session_id}: {new_mode}"
+                logger.info(msg)
+
                 if new_mode not in [OutputMode.TEXT.value, OutputMode.AUDIO.value]:
+                    msg = f"[WebSocket] Invalid mode received: {new_mode}"
+                    logger.error(msg)
                     await connection_manager.send_error(
                         session_id,
                         f"Invalid mode: {new_mode}. Must be 'text' or 'audio'",
@@ -124,10 +129,10 @@ async def websocket_chat_endpoint(  # noqa: C901, PLR0912, PLR0915
                 try:
                     await chat_service.update_session_mode(session_id, new_mode, db)
                     await connection_manager.send_mode_changed(session_id, new_mode)
-                    msg = f"Session {session_id} mode changed to {new_mode}"
+                    msg = f"[WebSocket] Session {session_id} mode successfully changed to {new_mode}"
                     logger.info(msg)
                 except Exception:
-                    msg = "Failed to update session mode."
+                    msg = f"[WebSocket] Failed to update session {session_id} mode to {new_mode}"
                     logger.exception(msg)
                     await connection_manager.send_error(
                         session_id, msg, "MODE_UPDATE_FAILED"
