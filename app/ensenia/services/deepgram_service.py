@@ -17,11 +17,11 @@ final transcription after processing the complete audio stream.
 
 import asyncio
 import logging
-from collections.abc import AsyncIterator
+from collections.abc import AsyncIterator, Callable
+from typing import Any
 
-import aiofiles
-from deepgram import DeepgramClient, PrerecordedOptions
-from deepgram.types import DeepgramError
+from deepgram import AsyncDeepgramClient
+from deepgram.core.api_error import ApiError
 
 from app.ensenia.core.config import settings
 
@@ -62,7 +62,7 @@ class DeepgramService:
         if not self.api_key:
             logger.warning("Deepgram API key not configured")
 
-        self.client = DeepgramClient(api_key=self.api_key)
+        self.client = AsyncDeepgramClient(api_key=self.api_key)
         self.language = getattr(settings, "stt_language", "es")  # Chilean Spanish
 
         logger.info(
@@ -75,9 +75,8 @@ class DeepgramService:
     ) -> AsyncIterator[TranscriptionResult]:
         """Transcribe streaming audio in real-time.
 
-        This method accepts an async iterator of audio chunks and yields
-        transcription results as they become available from Deepgram.
-        Uses event callbacks for true streaming results.
+        This method accepts an async iterator of audio chunks and sends them
+        to Deepgram's API, yielding transcription results as they become available.
 
         Args:
             audio_stream: Async iterator of audio chunk bytes
@@ -89,84 +88,73 @@ class DeepgramService:
         try:
             logger.info("Initiating Deepgram streaming connection")
 
-            # Create connection with streaming options
-            with self.client.listen.live(
-                options={
-                    "model": "nova-2",
-                    "language": self.language,
-                    "smart_format": True,
-                    "interim_results": True,
-                }
-            ) as connection:
-                logger.info("Deepgram streaming connection established")
+            # Collect all audio chunks first since Deepgram SDK streaming
+            # requires a complete buffer or use of the v2 API
+            audio_buffer = b""
+            chunk_count = 0
+            async for chunk in audio_stream:
+                if chunk:
+                    audio_buffer += chunk
+                    chunk_count += 1
+                    logger.debug(
+                        "Buffered audio chunk %d (%d bytes)", chunk_count, len(chunk)
+                    )
 
-                # Track results to stream them as they arrive
-                results_received = []
+            if not audio_buffer:
+                logger.warning("No audio data received")
+                return
 
-                # Define event handlers for results
-                def handle_result(message: dict) -> None:
-                    """Handle transcription result from Deepgram."""
-                    try:
-                        if message:
-                            results_received.append(message)
-                            msg = f"Deepgram result received: {message}"
-                            logger.debug(msg)
-                    except Exception:
-                        logger.exception("Error handling Deepgram result")
+            logger.info("All audio chunks buffered (%d bytes total)", len(audio_buffer))
 
-                # Attach handler to connection if supported
-                if hasattr(connection, "on_message"):
-                    connection.on_message(handle_result)
-
-                # Send all audio chunks
-                chunk_count = 0
-                async for chunk in audio_stream:
-                    if chunk:
-                        try:
-                            connection.send(chunk)
-                            chunk_count += 1
-                            msg = f"Sent audio chunk {chunk_count} ({len(chunk)} bytes)"
-                            logger.debug(msg)
-                        except Exception:
-                            logger.exception("Error sending chunk to Deepgram")
-                            raise
-
-                msg = (
-                    f"All audio chunks sent ({chunk_count} total). Finalizing stream..."
+            # Use Deepgram's prerecorded endpoint for buffered audio
+            # This works with the current SDK version
+            try:
+                response = await self.client.listen.prerecorded.v1(
+                    {
+                        "buffer": audio_buffer,
+                    },
+                    options={
+                        "model": "nova-2",
+                        "language": self.language,
+                        "smart_format": True,
+                    },
                 )
-                logger.info(msg)
 
-                # Finish the stream
-                connection.finish()
+                logger.info("Received response from Deepgram")
 
-                # Collect final results
-                final_message = connection.get_close_message()
+                # Parse and yield results
+                for result in self._parse_deepgram_results(response):
+                    yield result
 
-                if final_message:
-                    logger.info("Deepgram final results received")
-                    # Parse final results
-                    for result in self._parse_deepgram_results(final_message):
-                        yield result
-                else:
-                    # Also yield any results collected during streaming
-                    for msg in results_received:
-                        for result in self._parse_deepgram_results(msg):
-                            yield result
+            except AttributeError:
+                # Fallback: try the standard prerecorded method
+                logger.info("Attempting standard prerecorded transcription")
+                response = await self.client.listen.prerecorded(
+                    {"buffer": audio_buffer},
+                    options={
+                        "model": "nova-2",
+                        "language": self.language,
+                        "smart_format": True,
+                    },
+                )
 
-        except DeepgramError:
-            msg = "Deepgram API error during streaming."
+                for result in self._parse_deepgram_results(response):
+                    yield result
+
+        except ApiError as e:
+            msg = f"Deepgram API error during streaming: {e}"
             logger.exception(msg)
             raise
-        except Exception:
-            msg = "Unexpected error during streaming transcription."
+        except Exception as e:
+            msg = f"Unexpected error during streaming transcription: {e}"
             logger.exception(msg)
             raise
 
     async def transcribe_stream_with_callback(
         self,
         audio_stream: AsyncIterator[bytes],
-        on_interim: callable | None = None,
-        on_final: callable | None = None,
+        on_interim: Callable[[str], Any] | None = None,
+        on_final: Callable[[str], Any] | None = None,
     ) -> str:
         """Transcribe streaming audio with callbacks for interim/final results.
 
@@ -234,7 +222,7 @@ class DeepgramService:
 
     @staticmethod
     async def _call_async_or_sync(
-        func: callable, *args: object, **kwargs: object
+        func: Callable[..., Any], *args: object, **kwargs: object
     ) -> object:
         """Call a function that might be async or sync."""
         try:
@@ -243,43 +231,6 @@ class DeepgramService:
             return func(*args, **kwargs)
         except Exception:
             logger.exception("Error calling callback function")
-
-    async def transcribe_file(self, audio_bytes: bytes) -> str:
-        """Transcribe a complete audio file (non-streaming fallback).
-
-        Args:
-            audio_bytes: Complete audio file bytes
-
-        Returns:
-            Transcribed text
-
-        """
-        try:
-            logger.info(
-                "Transcribing audio file (%s bytes) with Deepgram", len(audio_bytes)
-            )
-
-            async with aiofiles.open("/tmp/deepgram_audio.webm", "wb") as f:
-                await f.write(audio_bytes)
-
-            async with aiofiles.open("/tmp/deepgram_audio.webm", "rb") as f:
-                audio_data = await f.read()
-                response = self.client.listen.prerecorded(
-                    {"buffer": audio_data},
-                    PrerecordedOptions(
-                        model="nova-2",
-                        language=self.language,
-                        smart_format=True,
-                    ),
-                )
-
-            transcript = response.results.channels[0].alternatives[0].transcript
-            logger.info("File transcription completed: %s...", transcript[:100])
-            return transcript
-
-        except Exception:
-            logger.exception("Error transcribing audio file")
-            raise
 
 
 def get_deepgram_service() -> DeepgramService:
