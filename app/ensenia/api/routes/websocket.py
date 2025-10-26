@@ -5,10 +5,13 @@ Handles WebSocket connections for chat sessions, enabling:
 - Real-time audio generation
 - Dynamic mode switching (text <-> audio)
 - Bidirectional communication
+- Speech-to-text audio transcription
 """
 
+import base64
 import json
 import logging
+from collections.abc import AsyncIterator
 from typing import Any
 
 from fastapi import APIRouter, Depends, WebSocket, WebSocketDisconnect
@@ -18,6 +21,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.ensenia.database.models import OutputMode
 from app.ensenia.database.session import get_db
 from app.ensenia.services.chat_service import ChatService
+from app.ensenia.services.deepgram_service import get_deepgram_service
 from app.ensenia.services.stream_orchestrator import (
     process_message_with_dual_stream,
 )
@@ -34,30 +38,50 @@ async def websocket_chat_endpoint(  # noqa: C901, PLR0912, PLR0915
     session_id: int,
     db: AsyncSession = Depends(get_db),  # noqa: B008
 ) -> None:
-    """WebSocket endpoint for real-time chat with audio support.
+    """WebSocket endpoint for real-time chat with Deepgram streaming STT.
+
+    Handles bidirectional communication including real-time speech-to-text
+    transcription via Deepgram and text-to-speech via ElevenLabs.
 
     Message Types (Client -> Server):
         - {type: "message", content: "text"} - Send chat message
-        - {type: "set_mode", mode: "text"|"audio"} - Switch output mode
+        - {type: "set_mode", mode: "text"|"audio"} - Switch output mode (text or audio)
+        - {type: "audio_chunk", data: "base64_audio"} - Send audio chunk for STT
+        - {type: "audio_end"} - Signal end of audio, triggers Deepgram transcription
         - {type: "ping"} - Keep-alive ping
 
     Message Types (Server -> Client):
+        - {type: "connected", ...} - Connection established
         - {type: "text_chunk", content: "..."} - Streaming text response
-        - {type: "audio_chunk", audio_id: "...", chunk_data: base64} - Audio stream
-        - {type: "audio_ready", audio_id: "...", url: "..."} - Full audio available
-        - {type: "mode_changed", mode: "text"|"audio"} - Confirm mode switch
-        - {type: "message_complete", message_id: int} - Message streaming done
+        - {type: "audio_ready", audio_id: "...", url: "..."} - TTS audio available
+        - {type: "stt_partial", transcript: "...", confidence: float} - Interim transcription
+        - {type: "stt_result", transcript: "...", confidence: float} - Final transcription
+        - {type: "mode_changed", mode: "text"|"audio"} - Output mode changed
+        - {type: "message_complete", message_id: int} - Message streaming complete
         - {type: "error", message: "...", code: "..."} - Error occurred
         - {type: "pong"} - Response to ping
 
+    Audio Flow (STT):
+        1. Client sends {type: "audio_chunk", data: base64} messages
+        2. Server buffers chunks locally
+        3. Client sends {type: "audio_end"} when finished speaking
+        4. Server sends buffered audio to Deepgram streaming API
+        5. Deepgram processes and returns transcription
+        6. Server sends stt_result to client with final transcript
+        7. Client auto-processes final transcript as chat message
+
     Args:
         websocket: The WebSocket connection
-        session_id: The chat session ID
-        db: Database session (injected)
+        session_id: The chat session ID (for routing messages)
+        db: Database session for persisting chat and session data
 
     """
     # Initialize services
     chat_service = ChatService()
+    deepgram_service = get_deepgram_service()
+
+    # Buffer for audio chunks during recording
+    audio_buffer: list[bytes] = []
 
     # Verify session exists
     try:
@@ -136,6 +160,113 @@ async def websocket_chat_endpoint(  # noqa: C901, PLR0912, PLR0915
                     logger.exception(msg)
                     await connection_manager.send_error(
                         session_id, msg, "MODE_UPDATE_FAILED"
+                    )
+
+            elif message_type == "audio_chunk":
+                # Handle audio chunk from client
+                audio_data_b64 = message_data.get("data")
+                if not audio_data_b64:
+                    await connection_manager.send_error(
+                        session_id, "Audio data is required", "MISSING_AUDIO_DATA"
+                    )
+                    continue
+
+                try:
+                    # Decode base64 audio data
+                    audio_bytes = base64.b64decode(audio_data_b64)
+                    audio_buffer.append(audio_bytes)
+                    msg = f"[WebSocket] Audio chunk received for session {session_id}: {len(audio_bytes)} bytes"
+                    logger.debug(msg)
+                except Exception:
+                    msg = f"[WebSocket] Error decoding audio data for session {session_id}"
+                    logger.exception(msg)
+                    await connection_manager.send_error(
+                        session_id,
+                        "Failed to decode audio data",
+                        "AUDIO_DECODE_ERROR",
+                    )
+
+            elif message_type == "audio_end":
+                # Handle end of audio stream - transcribe with Deepgram streaming
+                if not audio_buffer:
+                    await connection_manager.send_error(
+                        session_id, "No audio data to transcribe", "NO_AUDIO_DATA"
+                    )
+                    continue
+
+                try:
+                    msg = f"[WebSocket] Starting Deepgram streaming transcription for session {session_id}"
+                    logger.info(msg)
+
+                    # Create async generator from audio buffer
+                    async def audio_chunk_generator() -> AsyncIterator[bytes]:
+                        """Yield audio chunks from buffer."""
+                        for chunk in audio_buffer:
+                            yield chunk
+
+                    # Track transcription results
+                    final_transcript = ""
+                    last_partial = ""
+
+                    # Stream transcription results from Deepgram
+                    async for result in deepgram_service.transcribe_stream(
+                        audio_chunk_generator()
+                    ):
+                        if result.is_final:
+                            final_transcript = result.transcript
+                            msg = f"[WebSocket] Final transcript for session {session_id}: {final_transcript}"
+                            logger.info(msg)
+
+                            # Send final result
+                            await connection_manager.send_message(
+                                session_id,
+                                {
+                                    "type": "stt_result",
+                                    "transcript": final_transcript,
+                                    "confidence": result.confidence,
+                                },
+                            )
+                        elif result.transcript != last_partial:
+                            last_partial = result.transcript
+                            msg = f"[WebSocket] Partial transcript for session {session_id}: {result.transcript}"
+                            logger.debug(msg)
+
+                            await connection_manager.send_message(
+                                session_id,
+                                {
+                                    "type": "stt_partial",
+                                    "transcript": result.transcript,
+                                    "confidence": result.confidence,
+                                },
+                            )
+
+                    # Clear buffer for next recording
+                    audio_buffer.clear()
+
+                    # Automatically process the final transcribed message as a chat message
+                    if final_transcript:
+                        try:
+                            await process_message_with_dual_stream(
+                                session_id=session_id,
+                                user_message=final_transcript,
+                                websocket=websocket,
+                                db=db,
+                            )
+                        except Exception:
+                            msg = f"Error processing transcribed message for session {session_id}."
+                            logger.exception(msg)
+                            await connection_manager.send_error(
+                                session_id, msg, "PROCESSING_ERROR"
+                            )
+
+                except Exception:
+                    msg = f"Error transcribing audio for session {session_id}."
+                    logger.exception(msg)
+                    audio_buffer.clear()  # Clear buffer on error
+                    await connection_manager.send_error(
+                        session_id,
+                        "Failed to transcribe audio with Deepgram",
+                        "TRANSCRIPTION_ERROR",
                     )
 
             elif message_type == "message":
