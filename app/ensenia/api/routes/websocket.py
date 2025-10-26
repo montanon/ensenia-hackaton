@@ -18,6 +18,9 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.ensenia.database.models import OutputMode
 from app.ensenia.database.session import get_db
 from app.ensenia.services.chat_service import ChatService
+from app.ensenia.services.stream_orchestrator import (
+    process_message_with_dual_stream,
+)
 from app.ensenia.services.websocket_manager import connection_manager
 
 logger = logging.getLogger(__name__)
@@ -138,11 +141,6 @@ async def websocket_chat_endpoint(  # noqa: C901, PLR0912, PLR0915
                         session_id, "Message content is required", "MISSING_CONTENT"
                     )
                     continue
-
-                # Import here to avoid circular dependency
-                from app.ensenia.services.stream_orchestrator import (  # noqa: PLC0415
-                    process_message_with_dual_stream,
-                )
 
                 try:
                     await process_message_with_dual_stream(
