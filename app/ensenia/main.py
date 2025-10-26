@@ -18,7 +18,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 
 from app.ensenia.api.routes import chat, exercises, tts, websocket
-from app.ensenia.config import get_settings
+from app.ensenia.core.config import settings
 from app.ensenia.database.session import close_db, init_db
 from app.ensenia.services.research_service import cleanup_research_service
 
@@ -28,7 +28,6 @@ logging.basicConfig(
 )
 
 logger = logging.getLogger(__name__)
-settings = get_settings()
 
 
 @asynccontextmanager

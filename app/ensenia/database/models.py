@@ -59,7 +59,10 @@ class Session(Base):
 
     # WebSocket and audio mode support
     current_mode: Mapped[str] = mapped_column(
-        String(10), nullable=False, default="text", server_default="text"
+        String(10),
+        nullable=False,
+        default=OutputMode.TEXT.value,
+        server_default=OutputMode.TEXT.value,
     )  # text or audio - current output mode preference
     ws_connection_id: Mapped[str | None] = mapped_column(
         String(100), nullable=True
@@ -102,7 +105,10 @@ class Message(Base):
 
     # Audio support fields
     output_mode: Mapped[str] = mapped_column(
-        String(10), nullable=False, default="text", server_default="text"
+        String(10),
+        nullable=False,
+        default=OutputMode.TEXT.value,
+        server_default=OutputMode.TEXT.value,
     )  # How this message was delivered: text or audio
     audio_id: Mapped[str | None] = mapped_column(
         String(100), nullable=True, index=True

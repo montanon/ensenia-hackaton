@@ -5,7 +5,6 @@ real-time mode switching between text and audio output.
 """
 
 import asyncio
-import hashlib
 import logging
 from datetime import UTC, datetime
 
@@ -13,15 +12,15 @@ from fastapi import WebSocket
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.ensenia.config import get_settings
+from app.ensenia.core.config import settings
 from app.ensenia.database.models import Message as DBMessage
+from app.ensenia.database.models import OutputMode
 from app.ensenia.database.models import Session as DBSession
 from app.ensenia.services.chat_service import ChatService
 from app.ensenia.services.elevenlabs_service import ElevenLabsService
 from app.ensenia.services.websocket_manager import connection_manager
 
 logger = logging.getLogger(__name__)
-settings = get_settings()
 
 
 async def process_message_with_dual_stream(
@@ -50,11 +49,11 @@ async def process_message_with_dual_stream(
     logger.info(msg)
 
     # Initialize services
-    chat_service = ChatService(db)
+    chat_service = ChatService()
     tts_service = ElevenLabsService()
 
     # Get session with messages
-    session = await chat_service.get_session(session_id)
+    session = await chat_service.get_session(session_id, db)
     if not session:
         msg = f"Session {session_id} not found"
         logger.error(msg)
@@ -70,7 +69,7 @@ async def process_message_with_dual_stream(
         role="user",
         content=user_message,
         timestamp=datetime.now(UTC),
-        output_mode="text",  # User messages are always text
+        output_mode=OutputMode.TEXT.value,  # User messages are always text
     )
     db.add(user_msg)
     try:
@@ -105,7 +104,7 @@ async def process_message_with_dual_stream(
     await db.refresh(session)
 
     # Generate and stream audio if in audio mode
-    if session.current_mode == "audio" and full_text:
+    if session.current_mode == OutputMode.AUDIO.value and full_text:
         audio_task = asyncio.create_task(
             stream_audio_response(
                 text_content=full_text,
@@ -135,7 +134,7 @@ async def process_message_with_dual_stream(
                     assistant_msg.audio_url = audio_info["audio_url"]
                     assistant_msg.audio_available = True
                     assistant_msg.audio_duration = audio_info.get("duration")
-                    assistant_msg.output_mode = "audio"
+                    assistant_msg.output_mode = OutputMode.AUDIO.value
                     await db.commit()
 
         except Exception:
@@ -227,8 +226,22 @@ async def stream_audio_response(
         Dict with audio_id, audio_url, and optional duration
 
     """
-    # Generate audio ID from text content
-    audio_id = hashlib.sha256(text_content.encode()).hexdigest()[:16]
+    # Generate cache key using the same method as ElevenLabsService
+    voice_settings = tts_service.get_voice_settings(grade)
+    voice_settings_dict = {
+        "stability": voice_settings.stability,
+        "similarity_boost": voice_settings.similarity_boost,
+        "style": voice_settings.style,
+        "use_speaker_boost": voice_settings.use_speaker_boost,
+        "speed": voice_settings.speed,
+    }
+
+    audio_id = tts_service._generate_cache_key(
+        text_content,
+        settings.elevenlabs_voice_id,
+        settings.elevenlabs_model_id,
+        voice_settings_dict,
+    )
 
     try:
         msg = f"Generating audio for session {session_id}, audio_id={audio_id}"

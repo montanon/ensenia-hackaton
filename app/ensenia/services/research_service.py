@@ -11,7 +11,7 @@ import httpx
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.ensenia.config import get_settings
+from app.ensenia.core.config import settings
 from app.ensenia.database.models import Session as DBSession
 from app.ensenia.models.curriculum import (
     FetchResponse,
@@ -24,7 +24,6 @@ from app.ensenia.models.curriculum import (
 )
 
 logger = logging.getLogger(__name__)
-settings = get_settings()
 
 # Module-level HTTP client (singleton pattern)
 _http_client: httpx.AsyncClient | None = None
