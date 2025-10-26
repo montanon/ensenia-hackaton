@@ -205,7 +205,7 @@ class TestGetExerciseEndpoint:
         response = client.get("/exercises/99999")
 
         assert response.status_code == 404
-        assert "not found" in response.json()["detail"].lower()
+        assert "not found" in response.json()["error"]["message"].lower()
 
 
 class TestLinkExerciseToSessionEndpoint:
@@ -232,7 +232,7 @@ class TestLinkExerciseToSessionEndpoint:
         )
 
         assert response.status_code == 400
-        assert "not found" in response.json()["detail"].lower()
+        assert "not found" in response.json()["error"]["message"].lower()
 
     async def test_link_to_nonexistent_session(self, async_client, sample_api_exercise):
         """Test linking to a non-existent session."""
@@ -257,7 +257,7 @@ class TestLinkExerciseToSessionEndpoint:
         )
 
         assert response.status_code == 400
-        assert "already linked" in response.json()["detail"].lower()
+        assert "already linked" in response.json()["error"]["message"].lower()
 
 
 class TestSubmitAnswerEndpoint:
