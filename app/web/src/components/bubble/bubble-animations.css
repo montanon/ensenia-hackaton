@@ -1,0 +1,88 @@
+/* Bouncy wiggle animation for speaking state */
+@keyframes bouncy-wiggle {
+  0%, 100% {
+    transform: scale(1) rotate(0deg) translateY(0);
+  }
+  10% {
+    transform: scale(1.1) rotate(-5deg) translateY(-4px);
+  }
+  20% {
+    transform: scale(1.05) rotate(5deg) translateY(-2px);
+  }
+  30% {
+    transform: scale(1.12) rotate(-3deg) translateY(-6px);
+  }
+  40% {
+    transform: scale(1.03) rotate(4deg) translateY(-1px);
+  }
+  50% {
+    transform: scale(1.08) rotate(-2deg) translateY(-3px);
+  }
+  60% {
+    transform: scale(1.06) rotate(3deg) translateY(-4px);
+  }
+  70% {
+    transform: scale(1.04) rotate(-4deg) translateY(-2px);
+  }
+  80% {
+    transform: scale(1.09) rotate(2deg) translateY(-5px);
+  }
+  90% {
+    transform: scale(1.02) rotate(-1deg) translateY(-1px);
+  }
+}
+
+/* Pulse animation for listening state */
+@keyframes listening-pulse {
+  0%, 100% {
+    transform: scale(1);
+    box-shadow: 0 0 0 0 rgba(59, 130, 246, 0.7);
+  }
+  50% {
+    transform: scale(1.05);
+    box-shadow: 0 0 0 10px rgba(59, 130, 246, 0);
+  }
+}
+
+/* Gentle float for idle state */
+@keyframes gentle-float {
+  0%, 100% {
+    transform: translateY(0px);
+  }
+  50% {
+    transform: translateY(-6px);
+  }
+}
+
+/* Slide-up animation for transcript */
+@keyframes slide-up {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Apply animations based on bubble state */
+.bubble-assistant {
+  transition: all 0.2s ease;
+}
+
+.bubble-speaking {
+  animation: bouncy-wiggle 0.8s ease-in-out infinite;
+}
+
+.bubble-listening {
+  animation: listening-pulse 1.5s ease-in-out infinite;
+}
+
+.bubble-idle {
+  animation: gentle-float 3s ease-in-out infinite;
+}
+
+.bubble-transcript {
+  animation: slide-up 0.3s ease-out;
+}
