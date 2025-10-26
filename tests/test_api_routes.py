@@ -36,15 +36,24 @@ class TestChatRoutes:
 
     async def test_create_session_with_research(self, client):
         """Test creating session with initial research topic."""
-        with patch(
-            "app.ensenia.services.research_service._get_http_client"
-        ) as mock_client_fn:
+        with (
+            patch(
+                "app.ensenia.services.research_service._get_http_client"
+            ) as mock_client_fn,
+            patch(
+                "app.ensenia.api.routes.chat.initialize_session_background"
+            ) as mock_init,
+        ):
+            # Mock HTTP client (no real credentials needed)
             mock_http = AsyncMock()
             mock_response = MagicMock()
             mock_response.status_code = 200
             mock_response.json.return_value = {"results": []}
             mock_http.post.return_value = mock_response
             mock_client_fn.return_value = mock_http
+
+            # Mock background task to complete successfully
+            mock_init.return_value = None
 
             response = await client.post(
                 "/chat/sessions",
@@ -58,7 +67,10 @@ class TestChatRoutes:
 
             assert response.status_code == 200
             data = response.json()
-            assert data["context_loaded"] is True
+            # Context loads asynchronously, so immediate response should be False
+            assert data["context_loaded"] is False
+            # Verify the background task was triggered
+            mock_init.assert_called_once()
 
     async def test_create_session_invalid_grade(self, client):
         """Test creating session with invalid grade."""
