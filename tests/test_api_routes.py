@@ -26,7 +26,7 @@ class TestChatRoutes:
             "/chat/sessions",
             json={"grade": 5, "subject": "Mathematics", "mode": "learn"},
         )
-c
+
         assert response.status_code == 200
         data = response.json()
         assert "session_id" in data
