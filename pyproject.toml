@@ -113,6 +113,22 @@ ignore = [
 ]
 "app/ensenia/services/exercise_repository.py" = ["PLR0913"]  # Repository methods need many params
 "app/ensenia/services/generation_service.py" = ["E501"]  # Long prompts are more readable
+"app/ensenia/scripts/*.py" = [
+    "G004",      # Logging with f-strings (script-specific convenience)
+    "E501",      # Line too long (scripts prioritize readability)
+    "EXE001",    # Shebang (auto-detected in scripts)
+    "C901",      # Cyclomatic complexity (test scripts can be complex)
+    "PLR0915",   # Too many statements (utility scripts)
+    "PLR0913",   # Too many arguments (utility scripts)
+    "PLR0911",   # Too many return statements (utility scripts)
+    "PLR2004",   # Magic values (utility scripts)
+    "BLE001",    # Blind exception (utility scripts)
+    "D417",      # Missing docstring arg (utility scripts)
+]
+"app/ensenia/services/cloudflare/vectorize.py" = [
+    "E501",      # Line too long
+    "ARG002",    # Unused arguments
+]
 
 [build-system]
 requires = ["hatchling", "hatch-vcs"]
