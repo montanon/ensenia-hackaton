@@ -219,7 +219,7 @@ class RAGDatabasePopulator:
                 logger.info(f"  [{pdf_idx}/{total_pdfs}] ({pdf_progress:.1f}%) Processing: {pdf_path.name}")
 
                 # Extract text from PDF
-                document = await self.pdf_processor.extract_text(pdf_path)
+                document = self.pdf_processor.extract_text(pdf_path)
 
                 if not document.text or len(document.text) < 100:
                     logger.warning(
