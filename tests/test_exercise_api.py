@@ -391,3 +391,6 @@ class TestEndToEndWorkflow:
         )
         assert session_exercises.status_code == 200
         assert session_exercises.json()["total"] == 1
+
+        # Cleanup: Rollback to ensure test isolation and prevent data leakage
+        await db_session.rollback()

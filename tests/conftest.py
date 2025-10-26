@@ -1,10 +1,13 @@
 """Pytest configuration and fixtures."""
 
 import asyncio
+import os
+import subprocess
 from collections.abc import AsyncGenerator
 from unittest.mock import MagicMock
 
 import pytest
+from sqlalchemy import create_engine, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.ensenia.database.session import close_db, init_db, reset_engine
@@ -53,22 +56,87 @@ async def reset_db_engine(mock_settings):
     await reset_engine()
 
 
+@pytest.fixture(scope="session", autouse=True)
+def setup_test_db():
+    """Test database with migrations setup.
+
+    This fixture:
+    1. Applies all pending migrations to the test database
+    2. Verifies that critical schema columns exist
+    3. Fails early if migrations don't succeed
+
+    """
+    project_root = "/Users/sebastian/Desktop/MontagnaInc/Projects/ensenia-hackaton"
+    venv_alembic = os.path.join(project_root, ".venv", "bin", "alembic")
+
+    # Apply migrations using subprocess with explicit venv alembic
+    result = subprocess.run(
+        [venv_alembic, "upgrade", "head"],
+        cwd=project_root,
+        capture_output=True,
+        text=True,
+    )
+
+    if result.returncode != 0:
+        print("=" * 80)
+        print("MIGRATION FAILED - Test database schema is not up to date!")
+        print("=" * 80)
+        print(f"Alembic stderr:\n{result.stderr}")
+        print(f"Alembic stdout:\n{result.stdout}")
+        print("=" * 80)
+        pytest.fail(
+            f"Database migrations failed. Cannot proceed with tests.\n"
+            f"stderr: {result.stderr}\nstdout: {result.stdout}"
+        )
+
+    # Verify critical schema columns exist using direct database connection
+    try:
+        # Use synchronous engine for schema verification (psycopg3 works with sync)
+        db_url = "postgresql+psycopg://ensenia:hackathon@localhost:5433/test"
+        engine = create_engine(db_url)
+
+        with engine.begin() as conn:
+            # Check that critical columns exist on sessions table
+            result = conn.execute(
+                text("""
+                    SELECT column_name
+                    FROM information_schema.columns
+                    WHERE table_name = 'sessions'
+                """)
+            )
+            columns = {row[0] for row in result}
+
+            # Critical columns that should exist after latest migration
+            required_columns = {"learning_content", "study_guide"}
+            missing_columns = required_columns - columns
+
+            if missing_columns:
+                pytest.fail(
+                    f"Database schema verification failed!\n"
+                    f"Missing columns: {missing_columns}\n"
+                    f"Available columns: {columns}"
+                )
+
+        engine.dispose()
+        print("✓ Test database schema verified successfully")
+    except Exception as e:
+        pytest.fail(f"Failed to verify test database schema: {e}")
+
+    yield
+    # Cleanup happens automatically after tests complete
+
+
 @pytest.fixture
 async def db_session() -> AsyncGenerator[AsyncSession, None]:
     """Provide a database session for tests.
 
     This creates a new session for each test to avoid event loop conflicts.
-    Explicitly depends on reset_db_engine to ensure proper ordering.
+    Assumes migrations have been applied by setup_test_db fixture.
     """
     # Import here to avoid circular dependency issues
-    # Ensure database is initialized
-    from app.ensenia.database.models import Base
     from app.ensenia.database.session import AsyncSessionLocal, engine
 
     try:
-        async with engine.begin() as conn:
-            await conn.run_sync(Base.metadata.create_all)
-
         # Create and yield session
         async with AsyncSessionLocal() as session:
             try:
@@ -81,6 +149,32 @@ async def db_session() -> AsyncGenerator[AsyncSession, None]:
         # If there's an error creating the session, still try to close the engine
         await engine.dispose()
         raise
+
+
+@pytest.fixture
+async def test_client(db_session):  # noqa: ARG001
+    """Create standardized async test client with database dependency.
+
+    This is the standard client fixture that should be used in all tests.
+    It ensures:
+    1. Database is initialized before client is created (via db_session dependency)
+    2. All tests use async/await consistently
+    3. Proper cleanup happens via db_session fixture rollback
+
+    Usage:
+        async def test_something(test_client):
+            response = await test_client.get("/endpoint")
+            assert response.status_code == 200
+    """
+    import httpx
+
+    from app.ensenia.main import app
+
+    transport = httpx.ASGITransport(app=app)
+    async with httpx.AsyncClient(
+        transport=transport, base_url="http://test", timeout=10.0
+    ) as client:
+        yield client
 
 
 @pytest.fixture(autouse=True)
