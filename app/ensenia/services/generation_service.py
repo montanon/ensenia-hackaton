@@ -69,8 +69,8 @@ class GenerationState(BaseModel):
 # Prompt Templates
 # ============================================================================
 
-GENERATOR_SYSTEM_PROMPT = """Eres un experto en educación chilena y diseño de ejercicios pedagógicos.
-Tu tarea es crear ejercicios de alta calidad alineados con las Bases Curriculares del Ministerio de Educación de Chile.
+GENERATOR_SYSTEM_PROMPT = """Eres un experto en educación chilena y diseño de ejercicios pedagógicos.  # noqa: E501
+Tu tarea es crear ejercicios de alta calidad alineados con las Bases Curriculares del Ministerio de Educación de Chile.  # noqa: E501
 
 INSTRUCCIONES IMPORTANTES:
 1. El ejercicio DEBE estar completamente en español chileno
@@ -92,11 +92,11 @@ PARÁMETROS DEL EJERCICIO:
 
 {type_specific_instructions}
 
-IMPORTANTE: Responde SOLO con un JSON válido que siga exactamente el esquema especificado.
+IMPORTANTE: Responde SOLO con un JSON válido que siga exactamente el esquema especificado.  # noqa: E501
 No incluyas texto adicional, solo el JSON."""
 
-VALIDATOR_SYSTEM_PROMPT = """Eres un evaluador experto de ejercicios educativos para el sistema educativo chileno.
-Tu tarea es evaluar la calidad de ejercicios generados y proporcionar retroalimentación constructiva.
+VALIDATOR_SYSTEM_PROMPT = """Eres un evaluador experto de ejercicios educativos para el sistema educativo chileno.  # noqa: E501
+Tu tarea es evaluar la calidad de ejercicios generados y proporcionar retroalimentación constructiva.  # noqa: E501
 
 CRITERIOS DE EVALUACIÓN (puntaje 0-10):
 1. Alineación curricular (0-2 puntos): ¿Se alinea con las Bases Curriculares?
@@ -240,7 +240,7 @@ def generate_node(state: GenerationState) -> dict[str, Any]:
     if state.iteration_count == 0:
         user_message = f"Genera un ejercicio de tipo {state.exercise_type.value} sobre el tema: {state.topic}"
     else:
-        user_message = f"""Mejora el siguiente ejercicio basándote en esta retroalimentación:
+        user_message = f"""Mejora el siguiente ejercicio basándote en esta retroalimentación:  # noqa: E501
 
 RETROALIMENTACIÓN:
 {state.validation_feedback}

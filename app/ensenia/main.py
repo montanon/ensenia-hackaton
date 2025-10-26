@@ -111,8 +111,12 @@ def root() -> dict[str, Any]:
                 "search": "POST /exercises/search",
                 "get": "GET /exercises/{id}",
                 "link_to_session": "POST /exercises/{id}/sessions/{session_id}",
-                "submit_answer": "POST /exercises/sessions/{exercise_session_id}/submit",
-                "get_session_exercises": "GET /exercises/sessions/{session_id}/exercises",
+                "submit_answer": (
+                    "POST /exercises/sessions/{exercise_session_id}/submit"
+                ),
+                "get_session_exercises": (
+                    "GET /exercises/sessions/{session_id}/exercises"
+                ),
             },
             "docs": "GET /docs",
         },

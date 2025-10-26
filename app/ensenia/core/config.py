@@ -79,9 +79,6 @@ class Settings(BaseSettings):
     workers_ai_embedding_model: str = "@cf/baai/bge-base-en-v1.5"
     workers_ai_embedding_dimensions: int = 768
 
-    # Cloudflare Worker URL
-    cloudflare_worker_url: str = "http://localhost:8787"
-
     @field_validator("api_cors_origins", mode="after")
     @classmethod
     def parse_cors_origins(cls, v: str) -> list[str]:

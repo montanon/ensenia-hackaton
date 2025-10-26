@@ -60,7 +60,7 @@ class TestSimpleTTS:
         self,
         client,
         mock_service,
-        mock_text_processor,  # noqa: ARG002
+        mock_text_processor,
     ):
         """Generate audio successfully."""
         mock_service.generate_speech = AsyncMock(return_value=b"fake audio data")
@@ -72,7 +72,7 @@ class TestSimpleTTS:
         assert response.content == b"fake audio data"
         mock_service.generate_speech.assert_awaited_once()
 
-    async def test_validation_error(self, client, mock_service, mock_text_processor):  # noqa: ARG002
+    async def test_validation_error(self, client, mock_service, mock_text_processor):
         """Reject invalid text."""
         mock_text_processor["validate"].return_value = (False, "Text too long")
 
@@ -84,21 +84,21 @@ class TestSimpleTTS:
     async def test_missing_text_parameter(
         self,
         client,
-        mock_service,  # noqa: ARG002
-        mock_text_processor,  # noqa: ARG002
+        mock_service,
+        mock_text_processor,
     ):
         """Reject missing text parameter."""
         response = await client.get("/tts/speak?grade=5")
 
         assert response.status_code == 422  # Validation error
 
-    async def test_invalid_grade_level(self, client, mock_service, mock_text_processor):  # noqa: ARG002
+    async def test_invalid_grade_level(self, client, mock_service, mock_text_processor):
         """Reject invalid grade level."""
         response = await client.get("/tts/speak?text=Hola&grade=15")
 
         assert response.status_code == 422
 
-    async def test_service_error(self, client, mock_service, mock_text_processor):  # noqa: ARG002
+    async def test_service_error(self, client, mock_service, mock_text_processor):
         """Handle service errors gracefully."""
         mock_service.generate_speech.side_effect = Exception("API error")
 
@@ -107,7 +107,7 @@ class TestSimpleTTS:
         assert response.status_code == 500
         assert "TTS generation failed" in response.json()["detail"]
 
-    async def test_default_grade_level(self, client, mock_service, mock_text_processor):  # noqa: ARG002
+    async def test_default_grade_level(self, client, mock_service, mock_text_processor):
         """Use default grade level when not specified."""
         mock_service.generate_speech = AsyncMock(return_value=b"audio")
 
@@ -126,7 +126,7 @@ class TestAdvancedTTS:
         self,
         client,
         mock_service,
-        mock_text_processor,  # noqa: ARG002
+        mock_text_processor,
     ):
         """Generate audio with caching enabled."""
         mock_service.generate_speech = AsyncMock(return_value=b"cached audio")
@@ -144,7 +144,7 @@ class TestAdvancedTTS:
         )
 
     async def test_generation_without_cache(
-        self, client, mock_service, mock_text_processor  # noqa: ARG002
+        self, client, mock_service, mock_text_processor
     ):
         """Generate audio with caching disabled."""
         mock_service.generate_speech = AsyncMock(return_value=b"fresh audio")
@@ -160,7 +160,7 @@ class TestAdvancedTTS:
         )
 
     async def test_validation_error_in_body(
-        self, client, mock_service, mock_text_processor  # noqa: ARG002
+        self, client, mock_service, mock_text_processor
     ):
         """Reject invalid text in request body."""
         mock_text_processor["validate"].return_value = (False, "Empty text")
@@ -173,14 +173,14 @@ class TestAdvancedTTS:
         assert response.status_code == 400
 
     async def test_invalid_json_structure(
-        self, client, mock_service, mock_text_processor  # noqa: ARG002
+        self, client, mock_service, mock_text_processor
     ):
         """Reject malformed JSON."""
         response = await client.post("/tts/generate", json={"invalid": "structure"})
 
         assert response.status_code == 422
 
-    async def test_default_values(self, client, mock_service, mock_text_processor):  # noqa: ARG002
+    async def test_default_values(self, client, mock_service, mock_text_processor):
         """Use default values for optional fields."""
         mock_service.generate_speech = AsyncMock(return_value=b"audio")
 
@@ -196,7 +196,7 @@ class TestStreamingTTS:
     """Test GET /tts/stream endpoint."""
 
     async def test_successful_streaming(
-        self, client, mock_service, mock_text_processor  # noqa: ARG002
+        self, client, mock_service, mock_text_processor
     ):
         """Stream audio successfully."""
 
@@ -214,7 +214,7 @@ class TestStreamingTTS:
     async def test_validation_error_streaming(
         self,
         client,
-        mock_service,  # noqa: ARG002
+        mock_service,
         mock_text_processor,
     ):
         """Reject invalid text for streaming."""
@@ -225,7 +225,7 @@ class TestStreamingTTS:
         assert response.status_code == 400
 
     async def test_streaming_service_error(
-        self, client, mock_service, mock_text_processor  # noqa: ARG002
+        self, client, mock_service, mock_text_processor
     ):
         """Handle streaming errors."""
         mock_service.generate_speech_streaming.side_effect = Exception("Stream error")
@@ -242,7 +242,7 @@ class TestBatchTTS:
         self,
         client,
         mock_service,
-        mock_text_processor,  # noqa: ARG002
+        mock_text_processor,
     ):
         """Generate audio for multiple segments."""
         mock_service.generate_multiple_segments.return_value = [
@@ -270,7 +270,7 @@ class TestBatchTTS:
         assert data["audio_length"] > 0
 
     async def test_single_segment_batch(
-        self, client, mock_service, mock_text_processor  # noqa: ARG002
+        self, client, mock_service, mock_text_processor
     ):
         """Handle single segment batch."""
         mock_service.generate_multiple_segments.return_value = [b"audio"]
@@ -287,7 +287,7 @@ class TestBatchTTS:
         self,
         client,
         mock_service,
-        mock_text_processor,  # noqa: ARG002
+        mock_text_processor,
     ):
         """Use segment-specific grade levels."""
         mock_service.generate_multiple_segments = AsyncMock(return_value=[b"a", b"b"])
@@ -309,7 +309,7 @@ class TestBatchTTS:
         assert processed[0]["grade_level"] == 3
         assert processed[1]["grade_level"] == 11
 
-    async def test_invalid_segment(self, client, mock_service, mock_text_processor):  # noqa: ARG002
+    async def test_invalid_segment(self, client, mock_service, mock_text_processor):
         """Reject batch with invalid segment."""
         mock_text_processor["validate"].side_effect = [
             (True, ""),
@@ -330,7 +330,7 @@ class TestBatchTTS:
         assert response.status_code == 400
         assert "Invalid segment" in response.json()["detail"]
 
-    async def test_empty_segments_list(self, client, mock_service, mock_text_processor):  # noqa: ARG002
+    async def test_empty_segments_list(self, client, mock_service, mock_text_processor):
         """Reject empty segments list."""
         response = await client.post(
             "/tts/batch",
@@ -339,7 +339,7 @@ class TestBatchTTS:
 
         assert response.status_code == 422
 
-    async def test_too_many_segments(self, client, mock_service, mock_text_processor):  # noqa: ARG002
+    async def test_too_many_segments(self, client, mock_service, mock_text_processor):
         """Reject too many segments."""
         segments = [{"text": f"Segment {i}"} for i in range(11)]
         response = await client.post(
@@ -353,7 +353,7 @@ class TestBatchTTS:
 class TestHealthCheck:
     """Test GET /tts/health endpoint."""
 
-    async def test_healthy_service(self, client, mock_service, mock_text_processor):  # noqa: ARG002
+    async def test_healthy_service(self, client, mock_service, mock_text_processor):
         """Return healthy status."""
         response = await client.get("/tts/health")
 
@@ -368,7 +368,7 @@ class TestHealthCheck:
         self,
         client,
         mock_service,
-        mock_text_processor,  # noqa: ARG002
+        mock_text_processor,
     ):
         """Handle service errors in health check."""
         # Make cache_dir property raise an exception

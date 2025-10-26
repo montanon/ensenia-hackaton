@@ -249,7 +249,7 @@ class ChatService:
 
     async def send_message_streaming(
         self, session: DBSession, user_message: str, db: AsyncSession
-    ):
+    ) -> object:
         """Send a message and stream AI response chunks.
 
         Args:

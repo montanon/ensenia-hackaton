@@ -7,7 +7,7 @@ from unittest.mock import MagicMock
 import pytest
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.ensenia.database.session import close_db, get_db, init_db
+from app.ensenia.database.session import close_db, init_db
 
 
 @pytest.fixture

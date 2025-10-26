@@ -99,7 +99,11 @@ ignore = [
     "PLC0415",   # Import not at top (sometimes needed for mocking)
     "TRY003",    # Long exception messages (acceptable in test mocks)
     "PT012",     # Complex pytest.raises blocks (acceptable in tests)
+    "ARG002",    # Unused method argument (test fixtures often unused)
+    "E501",      # Line too long (test strings can be verbose)
 ]
+"app/ensenia/services/exercise_repository.py" = ["PLR0913"]  # Repository methods need many params
+"app/ensenia/services/generation_service.py" = ["E501"]  # Long prompts are more readable
 
 [build-system]
 requires = ["hatchling", "hatch-vcs"]

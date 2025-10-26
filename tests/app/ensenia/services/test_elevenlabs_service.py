@@ -130,12 +130,12 @@ class TestCacheOperations:
 class TestFactoryFunction:
     """Test service factory."""
 
-    def test_factory_creates_instance(self, mock_settings, mock_client):  # noqa: ARG002
+    def test_factory_creates_instance(self, mock_settings, mock_client):
         """Factory returns service instance."""
         service = get_elevenlabs_service()
         assert isinstance(service, ElevenLabsService)
 
-    def test_factory_creates_new_instance_each_time(self, mock_settings, mock_client):  # noqa: ARG002
+    def test_factory_creates_new_instance_each_time(self, mock_settings, mock_client):
         """Each call creates a new instance."""
         s1 = get_elevenlabs_service()
         s2 = get_elevenlabs_service()

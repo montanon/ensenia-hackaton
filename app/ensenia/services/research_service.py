@@ -5,7 +5,7 @@ educational content and research capabilities.
 """
 
 import logging
-from typing import Any, Literal
+from typing import Literal
 
 import httpx
 from sqlalchemy import select

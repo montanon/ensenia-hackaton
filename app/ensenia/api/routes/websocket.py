@@ -24,11 +24,11 @@ router = APIRouter(prefix="/ws", tags=["websocket"])
 
 
 @router.websocket("/chat/{session_id}")
-async def websocket_chat_endpoint(
+async def websocket_chat_endpoint(  # noqa: C901, PLR0912, PLR0915
     websocket: WebSocket,
     session_id: int,
     db: AsyncSession = Depends(get_db),  # noqa: B008
-):
+) -> None:
     """WebSocket endpoint for real-time chat with audio support.
 
     Message Types (Client -> Server):
@@ -138,8 +138,8 @@ async def websocket_chat_endpoint(
                     continue
 
                 # Import here to avoid circular dependency
-                from app.ensenia.services.stream_orchestrator import (
-                    process_message_with_dual_stream,  # noqa: PLC0415
+                from app.ensenia.services.stream_orchestrator import (  # noqa: PLC0415
+                    process_message_with_dual_stream,
                 )
 
                 try:
