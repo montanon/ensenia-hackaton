@@ -70,6 +70,7 @@ app.add_middleware(
 app.include_router(tts.router)
 app.include_router(chat.router)
 app.include_router(websocket.router)  # WebSocket routes for real-time chat
+app.include_router(exercises.router)  # Exercise generation and management routes
 
 # Mount static files for cached audio
 cache_path = Path(settings.cache_dir)
