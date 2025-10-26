@@ -32,13 +32,9 @@ from app.ensenia.database.models import CurriculumContent
 from app.ensenia.services.embedding_service import EmbeddingService
 from app.ensenia.services.pdf_processor import PDFProcessor
 
-# Configure logging
-logging.basicConfig(
-    level=logging.INFO,
-    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
-    handlers=[logging.StreamHandler(sys.stdout)],
-)
 logger = logging.getLogger(__name__)
+
+MIN_TEXT_LENGTH = 100
 
 
 def extract_grade_from_folder(folder_name: str) -> int | None:
@@ -49,6 +45,7 @@ def extract_grade_from_folder(folder_name: str) -> int | None:
 
     Returns:
         Grade number or None if not found
+
     """
     # Try patterns: "8°", "8", "Grade 8", "grade-8"
     patterns = [
@@ -137,7 +134,9 @@ class RAGDatabasePopulator:
             subject_name = subject_dir.name
             progress_pct = (idx / total_subjects) * 100
             logger.info(f"\n{'=' * 60}")
-            logger.info(f"[{idx}/{total_subjects}] ({progress_pct:.1f}%) Processing Subject: {subject_name} (Grade {grade})")
+            logger.info(
+                f"[{idx}/{total_subjects}] ({progress_pct:.1f}%) Processing Subject: {subject_name} (Grade {grade})"
+            )
             logger.info(f"{'=' * 60}")
 
             # Find subject-specific PDFs
@@ -216,16 +215,25 @@ class RAGDatabasePopulator:
         for pdf_idx, pdf_path in enumerate(pdfs, 1):
             try:
                 pdf_progress = (pdf_idx / total_pdfs) * 100
-                logger.info(f"  [{pdf_idx}/{total_pdfs}] ({pdf_progress:.1f}%) Processing: {pdf_path.name}")
+                logger.info(
+                    f"  [{pdf_idx}/{total_pdfs}] ({pdf_progress:.1f}%) Processing: {pdf_path.name}"
+                )
 
                 # Extract text from PDF
-                document = self.pdf_processor.extract_text(pdf_path)
-
-                if not document.text or len(document.text) < 100:
-                    logger.warning(
-                        f"    ⚠ Skipping (insufficient text): {pdf_path.name}"
-                    )
+                try:
+                    document = self.pdf_processor.extract_text(pdf_path)
+                except Exception as pdf_error:
+                    msg = f"    ✗ PDF extraction failed: {pdf_path.name} - {pdf_error}"
+                    logger.exception(msg)
                     stats["files_failed"] += 1
+                    stats["errors"].append(msg)
+                    continue
+
+                if not document.text or len(document.text) < MIN_TEXT_LENGTH:
+                    msg = f"    ⚠ Skipping (insufficient text): {pdf_path.name}"
+                    logger.warning(msg)
+                    stats["files_failed"] += 1
+                    stats["errors"].append(msg)
                     continue
 
                 # Create content ID
@@ -243,7 +251,24 @@ class RAGDatabasePopulator:
                 existing = result.scalar_one_or_none()
 
                 if existing:
-                    logger.info(f"    ✓ Already exists, skipping: {content_id}")
+                    # Check if embeddings were already generated
+                    if existing.embedding_generated:
+                        msg = f"    ✓ Already exists with embeddings, skipping: {content_id}"
+                        logger.info(msg)
+                        stats["files_processed"] += 1
+                        continue
+                    # Content exists but embeddings missing - regenerate embeddings
+                    msg = f"    ⚠ Content exists but missing embeddings, regenerating: {content_id}"
+                    logger.info(msg)
+                    embedding_result = (
+                        await self.embedding_service.process_curriculum_content(
+                            content_id
+                        )
+                    )
+                    embeddings_count = embedding_result.get("embeddings_generated", 0)
+                    msg = f"    ✓ Generated {embeddings_count} embeddings"
+                    logger.info(msg)
+                    stats["embeddings_generated"] += embeddings_count
                     stats["files_processed"] += 1
                     continue
 
@@ -268,7 +293,8 @@ class RAGDatabasePopulator:
                 await self.db.commit()
                 await self.db.refresh(content)
 
-                logger.info(f"    ✓ Created content: {content_id}")
+                msg = f"    ✓ Created content: {content_id}"
+                logger.info(msg)
                 stats["content_created"] += 1
 
                 # Generate embeddings and store vectors
@@ -317,7 +343,9 @@ class RAGDatabasePopulator:
         for idx, content in enumerate(content_items, 1):
             try:
                 progress_pct = (idx / total_items) * 100
-                logger.info(f"[{idx}/{total_items}] ({progress_pct:.1f}%) Processing existing content: {content.id}")
+                logger.info(
+                    f"[{idx}/{total_items}] ({progress_pct:.1f}%) Processing existing content: {content.id}"
+                )
 
                 embedding_result = (
                     await self.embedding_service.process_curriculum_content(content.id)
