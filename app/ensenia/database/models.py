@@ -23,7 +23,7 @@ from sqlalchemy import (
     Text,
     func,
 )
-from sqlalchemy.dialects.postgresql import JSONB
+from sqlalchemy.dialects.postgresql import JSON, JSONB
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 
 
@@ -58,6 +58,14 @@ class Session(Base):
         nullable=False, index=True
     )  # learn/practice/evaluation/study
     research_context: Mapped[str | None] = mapped_column(Text, nullable=True)
+
+    # Generated content for Learn and Study pages
+    learning_content: Mapped[dict | None] = mapped_column(
+        JSON, nullable=True
+    )  # Structured learning materials from research
+    study_guide: Mapped[dict | None] = mapped_column(
+        JSON, nullable=True
+    )  # Study guide with key concepts and review materials
 
     # WebSocket and audio mode support
     current_mode: Mapped[str] = mapped_column(

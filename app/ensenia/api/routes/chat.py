@@ -20,6 +20,7 @@ from app.ensenia.database.models import Session as DBSession
 from app.ensenia.database.session import AsyncSessionLocal, get_db
 from app.ensenia.models import ChatMode
 from app.ensenia.services.chat_service import get_chat_service
+from app.ensenia.services.content_generation_service import ContentGenerationService
 from app.ensenia.services.exercise_pool_service import (
     get_exercise_pool_service,
 )
@@ -162,11 +163,16 @@ async def initialize_session_background(
                 logger.exception(msg)
                 context = None
 
-            # Step 2: Generate initial exercise pool
-            msg = f"[Background] Generating initial exercise pool for session {session_id}"
+            # Step 2: Generate initial exercise pool + content in parallel
+            msg = f"[Background] Generating exercises and content for session {session_id}"
             logger.info(msg)
+
             try:
-                exercise_ids = await pool_service.generate_initial_pool(
+                # Initialize content generation service
+                content_service = ContentGenerationService()
+
+                # Run exercises, learning content, and study guide in parallel
+                exercise_task = pool_service.generate_initial_pool(
                     session_id=session_id,
                     grade=grade,
                     subject=subject,
@@ -175,12 +181,50 @@ async def initialize_session_background(
                     pool_size=5,
                     curriculum_context=context,
                 )
-                msg = f"[Background] Generated {len(exercise_ids)} exercises for session {session_id}"
+
+                # Only generate content if we have research context
+                if context:
+                    learning_content_task = content_service.generate_learning_content(
+                        subject=subject,
+                        grade=grade,
+                        curriculum_context=context,
+                        topic=topic,
+                    )
+
+                    study_guide_task = content_service.generate_study_guide(
+                        subject=subject,
+                        grade=grade,
+                        curriculum_context=context,
+                        topic=topic,
+                    )
+
+                    # Wait for all tasks in parallel
+                    exercise_ids, learning_content, study_guide = await asyncio.gather(
+                        exercise_task,
+                        learning_content_task,
+                        study_guide_task,
+                        return_exceptions=False,
+                    )
+                else:
+                    # If no research context, just generate exercises
+                    exercise_ids = await exercise_task
+                    learning_content = None
+                    study_guide = None
+
+                # Update session with generated content
+                stmt = select(DBSession).where(DBSession.id == session_id)
+                result = await db.execute(stmt)
+                session = result.scalar_one()
+
+                session.learning_content = learning_content
+                session.study_guide = study_guide
+                await db.commit()
+
+                msg = f"[Background] Generated {len(exercise_ids)} exercises and content for session {session_id}"
                 logger.info(msg)
+
             except Exception:
-                msg = (
-                    f"[Background] Exercise generation failed for session {session_id}"
-                )
+                msg = f"[Background] Content/exercise generation failed for session {session_id}"
                 logger.exception(msg)
 
             msg = f"[Background] Session {session_id} initialization complete"
@@ -468,12 +512,108 @@ async def get_session_status(
             "exercise_count": pool_status["total_exercises"],
             "pending_exercises": pool_status["pending_exercises"],
             "pool_health": pool_status["pool_health"],
+            "learning_content_ready": session.learning_content is not None,
+            "study_guide_ready": session.study_guide is not None,
         }
 
     except HTTPException:
         raise
     except Exception as e:
         logger.exception("Error getting session status")
+        raise HTTPException(status_code=500, detail=str(e)) from e
+
+
+@router.get("/sessions/{session_id}/learning-content")
+async def get_learning_content(
+    session_id: int,
+    db: Annotated[AsyncSession, Depends(get_db)],
+) -> dict[str, Any]:
+    """Get structured learning content for a session.
+
+    Returns the generated learning materials from research context.
+
+    Args:
+        session_id: Session ID
+        db: Database session
+
+    Returns:
+        Learning content with sections, examples, and vocabulary
+
+    Raises:
+        HTTPException: If session not found or content not ready
+
+    """
+    try:
+        # Load session
+        stmt = select(DBSession).where(DBSession.id == session_id)
+        result = await db.execute(stmt)
+        session = result.scalar_one_or_none()
+
+        if not session:
+            raise HTTPException(status_code=404, detail="Session not found")
+
+        if session.learning_content is None:
+            raise HTTPException(
+                status_code=202,
+                detail="Learning content not yet generated. Please check back later.",
+            )
+
+        return {
+            "session_id": session_id,
+            "content": session.learning_content,
+        }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.exception("Error getting learning content")
+        raise HTTPException(status_code=500, detail=str(e)) from e
+
+
+@router.get("/sessions/{session_id}/study-guide")
+async def get_study_guide(
+    session_id: int,
+    db: Annotated[AsyncSession, Depends(get_db)],
+) -> dict[str, Any]:
+    """Get study guide for a session.
+
+    Returns the generated study guide with key concepts and review materials.
+
+    Args:
+        session_id: Session ID
+        db: Database session
+
+    Returns:
+        Study guide with concepts, summaries, common mistakes, and practice tips
+
+    Raises:
+        HTTPException: If session not found or guide not ready
+
+    """
+    try:
+        # Load session
+        stmt = select(DBSession).where(DBSession.id == session_id)
+        result = await db.execute(stmt)
+        session = result.scalar_one_or_none()
+
+        if not session:
+            raise HTTPException(status_code=404, detail="Session not found")
+
+        if session.study_guide is None:
+            raise HTTPException(
+                status_code=202,
+                detail="Study guide not yet generated. Please check back later.",
+            )
+
+        return {
+            "session_id": session_id,
+            "guide": session.study_guide,
+        }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.exception("Error getting study guide")
         raise HTTPException(status_code=500, detail=str(e)) from e
 
 

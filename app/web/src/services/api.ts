@@ -54,8 +54,20 @@ export const sessionApi = {
     exercise_count: number;
     pending_exercises: number;
     pool_health: string;
+    learning_content_ready: boolean;
+    study_guide_ready: boolean;
   }> => {
     const response = await api.get(`/chat/sessions/${sessionId}/status`);
+    return response.data;
+  },
+
+  getLearningContent: async (sessionId: number): Promise<any> => {
+    const response = await api.get(`/chat/sessions/${sessionId}/learning-content`);
+    return response.data;
+  },
+
+  getStudyGuide: async (sessionId: number): Promise<any> => {
+    const response = await api.get(`/chat/sessions/${sessionId}/study-guide`);
     return response.data;
   },
 };
