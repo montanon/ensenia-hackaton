@@ -111,6 +111,16 @@ def mock_settings(monkeypatch):
     # ElevenLabs settings
     mock_settings_obj.elevenlabs_api_key = "test-elevenlabs-key"
     mock_settings_obj.elevenlabs_voice_id = "test-voice-id"
+    mock_settings_obj.elevenlabs_model_id = "eleven_turbo_v2_5"
+    mock_settings_obj.audio_format = "mp3_44100_128"
+    mock_settings_obj.voice_stability_elementary = 0.70
+    mock_settings_obj.voice_stability_middle = 0.65
+    mock_settings_obj.voice_stability_high = 0.60
+    mock_settings_obj.voice_speed_elementary = 0.85
+    mock_settings_obj.voice_speed_middle = 0.95
+    mock_settings_obj.voice_speed_high = 1.00
+    mock_settings_obj.cache_max_size_mb = 500
+    mock_settings_obj.cache_ttl_hours = 24
 
     # Database settings
     mock_settings_obj.database_url = (
@@ -148,11 +158,19 @@ def mock_settings(monkeypatch):
     mock_settings_obj.cloudflare_worker_url = "http://localhost:8787"
     mock_settings_obj.cache_dir = "./test_cache"
 
-    # Patch the get_settings function to return our mock
-    monkeypatch.setattr("app.ensenia.config.get_settings", lambda: mock_settings_obj)
+    # Patch the settings object to return our mock
+    monkeypatch.setattr("app.ensenia.core.config.settings", mock_settings_obj)
     monkeypatch.setattr(
         "app.ensenia.services.research_service.settings", mock_settings_obj
     )
+    monkeypatch.setattr("app.ensenia.services.chat_service.settings", mock_settings_obj)
+    monkeypatch.setattr(
+        "app.ensenia.services.elevenlabs_service.settings", mock_settings_obj
+    )
+    monkeypatch.setattr(
+        "app.ensenia.services.stream_orchestrator.settings", mock_settings_obj
+    )
+    monkeypatch.setattr("app.ensenia.database.session.settings", mock_settings_obj)
 
     return mock_settings_obj
 
