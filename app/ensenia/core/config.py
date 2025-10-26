@@ -35,17 +35,44 @@ class Settings(BaseSettings):
 
     # Cloudflare Worker URL
     cloudflare_worker_url: str = "http://localhost:8787"
+    cloudflare_request_timeout: int = 30  # seconds
+    cloudflare_max_retries: int = 3
+    cloudflare_cache_ttl: int = 3600  # 1 hour for curriculum content
 
     # Database
     database_url: str = "postgresql+asyncpg://ensenia:hackathon@localhost:5433/ensenia"
+    database_pool_size: int = 5
+    database_max_overflow: int = 10
+
+    # Chat Configuration
+    chat_context_window: int = 10  # Number of messages to keep in context
 
     # ElevenLabs Text-to-Speech
     elevenlabs_api_key: str = ""
-    elevenlabs_voice_id: str = ""
+    elevenlabs_voice_id: str = "pNInz6obpgDQGcFmaJgB"  # Dorothy - Chilean Spanish
+    elevenlabs_model_id: str = "eleven_turbo_v2_5"
+
+    # Audio Configuration
+    audio_format: str = "mp3_44100_128"
+
+    # Voice Settings by Grade Level
+    voice_stability_elementary: float = 0.70  # Grades 1-4
+    voice_stability_middle: float = 0.65  # Grades 5-8
+    voice_stability_high: float = 0.60  # Grades 9-12
+
+    voice_speed_elementary: float = 0.85
+    voice_speed_middle: float = 0.95
+    voice_speed_high: float = 1.00
+
+    # Cache Configuration
+    cache_max_size_mb: int = 500
+    cache_ttl_hours: int = 24
 
     # OpenAI
     openai_api_key: str = ""
     openai_model: str = "gpt-4-turbo-preview"
+    openai_max_tokens: int = 2000
+    openai_temperature: float = 0.4
 
     # Exercise Generation Settings
     generation_max_iterations: int = 3
