@@ -34,38 +34,27 @@ export function LoginPage() {
     }
   };
 
-  const handleDemoLogin = async () => {
-    setEmail('demo@hackaton.ia');
-    setPassword('demo123!');
-    setError('');
-    setIsLoading(true);
-
-    try {
-      const result = await login('demo@hackaton.ia', 'demo123!');
-      if (result.success) {
-        setCurrentPage('learn');
-      } else {
-        setError(result.error || 'Login failed');
-      }
-    } catch (err) {
-      setError('An error occurred. Please try again.');
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center p-4">
-      <div className="w-full max-w-md">
+    <div className="min-h-screen bg-white flex items-center justify-center p-4 relative">
+      {/* Decorative Image */}
+      <img
+        src="/image.png"
+        alt="Decorative"
+        className="absolute bottom-0 -right-12 h-64 md:h-96 object-contain opacity-90"
+      />
+
+      <div className="w-full max-w-md relative z-10">
         {/* Header */}
-        <div className="text-center mb-8">
-          <h1 className="text-4xl font-bold text-gray-900 mb-2">Ensenia</h1>
-          <p className="text-gray-600">Ingresa a tu cuenta</p>
+        <div className="text-center mb-12">
+          <h1 className="text-5xl font-bold mb-4">
+            Enseñ<span className="text-blue-600">IA</span>
+          </h1>
+          <p className="text-lg text-gray-600">Ingresa a tu cuenta</p>
         </div>
 
         {/* Login Card */}
-        <div className="bg-white rounded-lg shadow-lg p-8 mb-6">
-          <form onSubmit={handleSubmit} className="space-y-4">
+        <div className="bg-white rounded-lg shadow-lg border-t-4 border-blue-600 p-8 mb-6">
+          <form onSubmit={handleSubmit} className="space-y-6">
             {/* Email Input */}
             <div>
               <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-2">
@@ -78,7 +67,7 @@ export function LoginPage() {
                 onChange={(e) => setEmail(e.target.value)}
                 placeholder="ejemplo@correo.com"
                 disabled={isLoading}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 disabled:bg-gray-100"
+                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100"
                 required
               />
             </div>
@@ -95,7 +84,7 @@ export function LoginPage() {
                 onChange={(e) => setPassword(e.target.value)}
                 placeholder="••••••••"
                 disabled={isLoading}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 disabled:bg-gray-100"
+                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100"
                 required
               />
             </div>
@@ -111,37 +100,17 @@ export function LoginPage() {
             <button
               type="submit"
               disabled={isLoading}
-              className="w-full bg-indigo-600 hover:bg-indigo-700 disabled:bg-indigo-400 text-white font-bold py-2 px-4 rounded-lg transition mt-6"
+              className="w-full bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 text-white font-semibold py-5 px-20 rounded-lg transition duration-200 hover:shadow-lg text-xl mt-8"
             >
               {isLoading ? 'Ingresando...' : 'Ingresar'}
             </button>
           </form>
-
-          {/* Demo Login */}
-          <div className="mt-6 pt-6 border-t border-gray-200">
-            <p className="text-sm text-gray-600 text-center mb-3">Credenciales de demostración:</p>
-            <div className="bg-gray-50 rounded-lg p-3 text-xs text-gray-700 mb-4 space-y-1">
-              <p>
-                <span className="font-semibold">Correo:</span> demo@hackaton.ia
-              </p>
-              <p>
-                <span className="font-semibold">Contraseña:</span> demo123!
-              </p>
-            </div>
-            <button
-              onClick={handleDemoLogin}
-              disabled={isLoading}
-              className="w-full bg-gray-200 hover:bg-gray-300 disabled:bg-gray-100 text-gray-800 font-semibold py-2 px-4 rounded-lg transition"
-            >
-              Usar Credenciales de Demo
-            </button>
-          </div>
         </div>
 
         {/* Back Button */}
         <button
           onClick={handleBackToLanding}
-          className="w-full text-center text-indigo-600 hover:text-indigo-700 font-semibold transition"
+          className="w-full text-center text-blue-600 hover:text-blue-700 font-semibold transition"
         >
           ← Volver a Inicio
         </button>
