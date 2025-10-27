@@ -491,12 +491,9 @@ pytest
 This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
 
 ## 🙏 Acknowledgments
-
+- **Skyward and CommunityOS** for organizing such an amazing experience
 - **Chilean Ministry of Education** for providing open curriculum documents
-- **Cloudflare** for Workers AI, Vectorize, and D1 database
-- **ElevenLabs** for high-quality Spanish text-to-speech
-- **OpenAI** for GPT-4 and language understanding
-- **LangChain/LangGraph** for agent orchestration framework
+- **Cloudflare and ElevenLabs** for the credits for development
 
 ## 📞 Support
 
